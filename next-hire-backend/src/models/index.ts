@@ -1,0 +1,70 @@
+// models/index.ts
+import { sequelize } from "../config/database";
+
+import { User } from "./User";
+import { Candidate } from "./Candidate";
+import { Recruiter } from "./Recruiter";
+import { Vendor } from "./Vendor";
+import { Job } from "./Job";
+import { Submission } from "./Submission";
+import { Interview } from "./Interview";
+import { Task } from "./Task";
+
+let associationsApplied = false;
+
+export function applyAssociations() {
+  if (associationsApplied) return;
+  associationsApplied = true;
+
+  // User ↔ Profiles
+  User.hasOne(Candidate, { foreignKey: "user_id", as: "candidateProfile" });
+  User.hasOne(Recruiter, { foreignKey: "user_id", as: "recruiterProfile" });
+  User.hasOne(Vendor, { foreignKey: "user_id", as: "vendorProfile" });
+
+  Candidate.belongsTo(User, { foreignKey: "user_id", as: "user" });
+  Recruiter.belongsTo(User, { foreignKey: "user_id", as: "user" });
+  Vendor.belongsTo(User, { foreignKey: "user_id", as: "user" });
+
+  // Jobs
+  Job.belongsTo(User, { foreignKey: "created_by", as: "creator" });
+  Job.belongsTo(User, { foreignKey: "assigned_to", as: "assignee" });
+
+  // Submissions
+  Submission.belongsTo(Job, { foreignKey: "job_id", as: "job" });
+  Submission.belongsTo(Candidate, {
+    foreignKey: "candidate_id",
+    as: "candidate",
+  });
+  Submission.belongsTo(User, { foreignKey: "submitted_by", as: "submitter" });
+  Submission.belongsTo(User, { foreignKey: "reviewed_by", as: "reviewer" });
+
+  // Interviews
+  Interview.belongsTo(Submission, {
+    foreignKey: "submission_id",
+    as: "submission",
+  });
+  Interview.belongsTo(User, {
+    foreignKey: "interviewer_id",
+    as: "interviewer",
+  });
+  Interview.belongsTo(User, { foreignKey: "created_by", as: "creator" });
+
+  // Tasks
+  Task.belongsTo(User, { foreignKey: "assigned_to", as: "assignee" });
+  Task.belongsTo(User, { foreignKey: "created_by", as: "creator" });
+  Task.belongsTo(Job, { foreignKey: "job_id", as: "job" });
+  Task.belongsTo(Submission, { foreignKey: "submission_id", as: "submission" });
+}
+
+// Export models & sequelize
+export {
+  User,
+  Candidate,
+  Recruiter,
+  Vendor,
+  Job,
+  Submission,
+  Interview,
+  Task,
+  sequelize,
+};

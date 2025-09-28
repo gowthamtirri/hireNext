@@ -1,0 +1,232 @@
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+} from "react";
+import { toast } from "sonner";
+import { authService } from "@/services/authService";
+import {
+  User,
+  UserRole,
+  AuthContextType,
+  SignupRequest,
+  LoginRequest,
+  VerifyOTPRequest,
+  ResendOTPRequest,
+  ForgotPasswordRequest,
+  ResetPasswordRequest,
+  ChangePasswordRequest,
+} from "@/types/auth";
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+  return context;
+};
+
+interface AuthProviderProps {
+  children: React.ReactNode;
+}
+
+export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+  const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Initialize auth state from localStorage
+  useEffect(() => {
+    const initializeAuth = () => {
+      try {
+        const storedUser = authService.getCurrentUser();
+        const storedToken = authService.getToken();
+
+        if (storedUser && storedToken) {
+          setUser(storedUser);
+          setToken(storedToken);
+        }
+      } catch (error) {
+        console.error("Error initializing auth:", error);
+        authService.clearAuthData();
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initializeAuth();
+  }, []);
+
+  // Signup
+  const signup = useCallback(async (data: SignupRequest) => {
+    try {
+      setIsLoading(true);
+      const response = await authService.signup(data);
+      toast.success(
+        "Account created successfully! Please check your email for verification code."
+      );
+      return response;
+    } catch (error: any) {
+      toast.error(error.message || "Signup failed");
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Verify OTP
+  const verifyOTP = useCallback(async (data: VerifyOTPRequest) => {
+    try {
+      setIsLoading(true);
+      const response = await authService.verifyOTP(data);
+      setUser(response.user);
+      setToken(response.token);
+      toast.success("Email verified successfully!");
+      return response;
+    } catch (error: any) {
+      toast.error(error.message || "OTP verification failed");
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Resend OTP
+  const resendOTP = useCallback(async (data: ResendOTPRequest) => {
+    try {
+      await authService.resendOTP(data);
+      toast.success("Verification code sent to your email!");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to resend OTP");
+      throw error;
+    }
+  }, []);
+
+  // Login
+  const login = useCallback(async (data: LoginRequest) => {
+    try {
+      setIsLoading(true);
+      const response = await authService.login(data);
+      setUser(response.user);
+      setToken(response.token);
+      toast.success("Login successful!");
+      return response;
+    } catch (error: any) {
+      toast.error(error.message || "Login failed");
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Logout
+  const logout = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      await authService.logout();
+      setUser(null);
+      setToken(null);
+      toast.success("Logged out successfully");
+    } catch (error: any) {
+      console.error("Logout error:", error);
+      // Clear local state even if API call fails
+      setUser(null);
+      setToken(null);
+      authService.clearAuthData();
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Forgot Password
+  const forgotPassword = useCallback(async (data: ForgotPasswordRequest) => {
+    try {
+      await authService.forgotPassword(data);
+      toast.success("Password reset link sent to your email!");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to send reset email");
+      throw error;
+    }
+  }, []);
+
+  // Reset Password
+  const resetPassword = useCallback(async (data: ResetPasswordRequest) => {
+    try {
+      await authService.resetPassword(data);
+      toast.success("Password reset successfully!");
+    } catch (error: any) {
+      toast.error(error.message || "Password reset failed");
+      throw error;
+    }
+  }, []);
+
+  // Change Password
+  const changePassword = useCallback(async (data: ChangePasswordRequest) => {
+    try {
+      await authService.changePassword(data);
+      toast.success("Password changed successfully!");
+    } catch (error: any) {
+      toast.error(error.message || "Password change failed");
+      throw error;
+    }
+  }, []);
+
+  // Refresh Token
+  const refreshTokenFn = useCallback(async () => {
+    try {
+      const newToken = await authService.refreshToken();
+      setToken(newToken);
+      return newToken;
+    } catch (error: any) {
+      console.error("Token refresh failed:", error);
+      setUser(null);
+      setToken(null);
+      throw error;
+    }
+  }, []);
+
+  // Clear auth state
+  const clearAuth = useCallback(() => {
+    setUser(null);
+    setToken(null);
+    authService.clearAuthData();
+  }, []);
+
+  // Set user (for updates)
+  const setUserData = useCallback((userData: User) => {
+    setUser(userData);
+    localStorage.setItem("user", JSON.stringify(userData));
+  }, []);
+
+  const value: AuthContextType = {
+    // State
+    user,
+    token,
+    isAuthenticated: !!(user && token),
+    isLoading,
+
+    // Actions
+    signup,
+    verifyOTP,
+    resendOTP,
+    login,
+    logout,
+    forgotPassword,
+    resetPassword,
+    changePassword,
+    refreshToken: refreshTokenFn,
+
+    // Utilities
+    clearAuth,
+    setUser: setUserData,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};
+
+// Re-export types for convenience
+export type { User, UserRole };
