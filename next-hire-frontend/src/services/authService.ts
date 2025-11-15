@@ -195,8 +195,10 @@ class AuthService {
   /**
    * Store authentication data
    */
-  private storeAuthData(data: LoginResponse): void {
-    localStorage.setItem("token", data.token);
+  private storeAuthData(data: any): void {
+    // Handle both 'token' and 'accessToken' from backend
+    const token = data.token || data.accessToken;
+    localStorage.setItem("token", token);
     localStorage.setItem("refreshToken", data.refreshToken);
     localStorage.setItem("user", JSON.stringify(data.user));
   }

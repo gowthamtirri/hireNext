@@ -99,6 +99,7 @@ export interface AuthContextType {
   // Utilities
   clearAuth: () => void;
   setUser: (user: User) => void;
+  updateUserRole: (role: UserRole) => void;
 }
 
 // Error types

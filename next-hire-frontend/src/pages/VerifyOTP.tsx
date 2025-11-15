@@ -65,22 +65,8 @@ export default function VerifyOTP() {
     try {
       const response = await verifyOTP({ email, otp });
 
-      // Redirect based on user role to appropriate dashboard
-      const getRoleDashboard = (role: string) => {
-        switch (role) {
-          case "candidate":
-            return "/dashboard/job-search"; // Candidates go to job search
-          case "recruiter":
-            return "/dashboard/recruiter"; // Recruiters go to recruiter dashboard
-          case "vendor":
-            return "/dashboard/my-jobs"; // Vendors go to their job submissions
-          default:
-            return "/dashboard"; // Default dashboard
-        }
-      };
-
-      const dashboardRoute = getRoleDashboard(response.user.role);
-      navigate(dashboardRoute);
+      // Redirect to dashboard - view will change based on user role
+      navigate("/dashboard");
     } catch (error) {
       console.error("OTP verification failed:", error);
       setOtp(""); // Clear OTP on error

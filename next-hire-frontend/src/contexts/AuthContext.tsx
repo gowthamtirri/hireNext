@@ -84,7 +84,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setIsLoading(true);
       const response = await authService.verifyOTP(data);
       setUser(response.user);
-      setToken(response.token);
+      // Handle both 'token' and 'accessToken' from backend
+      const token = (response as any).token || (response as any).accessToken;
+      setToken(token);
       toast.success("Email verified successfully!");
       return response;
     } catch (error: any) {
@@ -111,8 +113,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       setIsLoading(true);
       const response = await authService.login(data);
+      console.log("AuthContext login - response:", response);
       setUser(response.user);
-      setToken(response.token);
+      // Handle both 'token' and 'accessToken' from backend
+      const token = (response as any).token || (response as any).accessToken;
+      console.log("AuthContext login - extracted token:", token);
+      setToken(token);
+      console.log("AuthContext login - user and token set");
       toast.success("Login successful!");
       return response;
     } catch (error: any) {
@@ -202,6 +209,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     localStorage.setItem("user", JSON.stringify(userData));
   }, []);
 
+  // Update user role (for role selection)
+  const updateUserRole = useCallback((role: UserRole) => {
+    if (user) {
+      const updatedUser = { ...user, role };
+      setUser(updatedUser);
+      localStorage.setItem("user", JSON.stringify(updatedUser));
+    }
+  }, [user]);
+
   const value: AuthContextType = {
     // State
     user,
@@ -223,6 +239,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     // Utilities
     clearAuth,
     setUser: setUserData,
+    updateUserRole,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

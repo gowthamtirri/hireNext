@@ -9,8 +9,18 @@ interface ProtectedRouteProps {
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const { isAuthenticated, isLoading, user } = useAuth();
 
+  console.log(
+    "ProtectedRoute - isLoading:",
+    isLoading,
+    "isAuthenticated:",
+    isAuthenticated,
+    "user:",
+    user
+  );
+
   // Show loading spinner while checking authentication
   if (isLoading) {
+    console.log("ProtectedRoute - Showing loading spinner");
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 via-emerald-50/30 to-green-100/50">
         <div className="text-center">
@@ -23,22 +33,13 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
 
   // Redirect to login if not authenticated
   if (!isAuthenticated) {
+    console.log("ProtectedRoute - Not authenticated, redirecting to login");
     return <Navigate to="/auth/login" replace />;
   }
 
-  // Check if user needs email verification
-  if (user && !user.email_verified) {
-    return (
-      <Navigate
-        to="/auth/verify-otp"
-        state={{
-          email: user.email,
-          message: "Please verify your email to access the dashboard",
-        }}
-        replace
-      />
-    );
-  }
+  console.log("ProtectedRoute - Authenticated, rendering children");
+  // Note: Email verification is handled by backend during login
+  // If user is authenticated, they are already verified
 
   return <>{children}</>;
 };

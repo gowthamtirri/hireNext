@@ -25,36 +25,26 @@ export default function Login() {
 
     try {
       const response = await login({ email, password });
+      console.log("Login response:", response);
 
-      // Check if user needs email verification
-      if (!response.user.email_verified) {
+      // If login is successful, user is already verified (backend ensures this)
+      // Use replace to avoid back button issues
+      console.log("Navigating to dashboard...");
+      navigate("/dashboard", { replace: true });
+    } catch (error: any) {
+      console.error("Login failed:", error);
+
+      // If error is about email verification, redirect to OTP page
+      if (error.message?.includes("verify your email")) {
         navigate("/auth/verify-otp", {
           state: {
-            email: response.user.email,
-            message: "Please verify your email to continue",
+            email: email,
+            message: "Please verify your email before logging in",
           },
         });
         return;
       }
 
-      // Redirect based on user role to appropriate dashboard
-      const getRoleDashboard = (role: string) => {
-        switch (role) {
-          case "candidate":
-            return "/dashboard/job-search"; // Candidates go to job search
-          case "recruiter":
-            return "/dashboard/recruiter"; // Recruiters go to recruiter dashboard
-          case "vendor":
-            return "/dashboard/my-jobs"; // Vendors go to their job submissions
-          default:
-            return "/dashboard"; // Default dashboard
-        }
-      };
-
-      const dashboardRoute = getRoleDashboard(response.user.role);
-      navigate(dashboardRoute);
-    } catch (error) {
-      console.error("Login failed:", error);
       // Error is already shown via toast in AuthContext
     }
   };
