@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -62,20 +62,137 @@ import {
   Search,
   RotateCw,
   UserPlus,
+  Loader2,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import usersData from "@/data/users.json";
+import { useInterviews, useInterviewStats, useInterviewManagement } from "@/hooks/useInterviews";
+import { interviewService, InterviewStatus, InterviewType } from "@/services/interviewService";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Interviews = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
   const [expandedJobs, setExpandedJobs] = useState<Set<string>>(new Set());
   const [expandedStages, setExpandedStages] = useState<Set<string>>(new Set());
   const [hoveredJob, setHoveredJob] = useState<string | null>(null);
   const [hoveredStage, setHoveredStage] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("interviews");
+
+  // Interview hooks
+  const { 
+    interviews, 
+    loading: interviewsLoading, 
+    error: interviewsError, 
+    pagination, 
+    fetchInterviews, 
+    refresh: refreshInterviews 
+  } = useInterviews();
+  
+  const { 
+    stats, 
+    loading: statsLoading, 
+    refresh: refreshStats 
+  } = useInterviewStats();
+  
+  const { 
+    loading: managementLoading,
+    updateInterview,
+    deleteInterview,
+    completeInterview,
+    cancelInterview,
+    rescheduleInterview
+  } = useInterviewManagement();
+
+  // Filters
+  const [statusFilter, setStatusFilter] = useState<InterviewStatus | "">("");
+  const [typeFilter, setTypeFilter] = useState<InterviewType | "">("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [dateFrom, setDateFrom] = useState<Date | undefined>();
+  const [dateTo, setDateTo] = useState<Date | undefined>();
+
+  // Apply filters
+  const handleApplyFilters = () => {
+    const filters: any = {};
+    if (statusFilter) filters.status = statusFilter;
+    if (typeFilter) filters.interview_type = typeFilter;
+    if (searchQuery) filters.search = searchQuery;
+    if (dateFrom) filters.date_from = dateFrom.toISOString();
+    if (dateTo) filters.date_to = dateTo.toISOString();
+    
+    fetchInterviews(filters);
+  };
+
+  // Clear filters
+  const handleClearFilters = () => {
+    setStatusFilter("");
+    setTypeFilter("");
+    setSearchQuery("");
+    setDateFrom(undefined);
+    setDateTo(undefined);
+    fetchInterviews({});
+  };
+
+  // Handle interview actions
+  const handleCompleteInterview = async (interviewId: string, feedback?: string, rating?: number) => {
+    const result = await completeInterview(interviewId, feedback, rating);
+    if (result) {
+      refreshInterviews();
+      refreshStats();
+    }
+  };
+
+  const handleCancelInterview = async (interviewId: string, reason?: string) => {
+    const result = await cancelInterview(interviewId, reason);
+    if (result) {
+      refreshInterviews();
+      refreshStats();
+    }
+  };
+
+  const handleRescheduleInterview = async (interviewId: string, newDateTime: string) => {
+    const result = await rescheduleInterview(interviewId, newDateTime);
+    if (result) {
+      refreshInterviews();
+      refreshStats();
+    }
+  };
+
+  const handleDeleteInterview = async (interviewId: string) => {
+    if (window.confirm("Are you sure you want to delete this interview?")) {
+      const result = await deleteInterview(interviewId);
+      if (result) {
+        refreshInterviews();
+        refreshStats();
+      }
+    }
+  };
+
+  // Group interviews by job
+  const interviewsByJob = interviews.reduce((acc, interview) => {
+    const jobKey = interview.submission?.job?.job_id || 'unknown';
+    if (!acc[jobKey]) {
+      acc[jobKey] = {
+        jobId: interview.submission?.job?.job_id || 'Unknown',
+        jobTitle: interview.submission?.job?.title || 'Unknown Position',
+        company: interview.submission?.job?.company_name || 'Unknown Company',
+        interviews: []
+      };
+    }
+    acc[jobKey].interviews.push(interview);
+    return acc;
+  }, {} as Record<string, any>);
+
+  // Calculate statistics
+  const totalInterviews = interviews.length;
+  const scheduledInterviews = interviews.filter(i => i.status === "scheduled").length;
+  const completedInterviews = interviews.filter(i => i.status === "completed").length;
+  const upcomingInterviews = interviews.filter(i => 
+    i.status === "scheduled" && interviewService.isUpcoming(i.scheduled_at)
+  ).length;
+  const totalJobs = Object.keys(interviewsByJob).length;
   
   // Todo state
   const [todos, setTodos] = useState([
@@ -168,72 +285,16 @@ const Interviews = () => {
     }
   };
 
-  // Mock interview data
-  const interviewsByJob = {
-    "JOB-2024-001-TechCorp": {
-      jobId: "JOB-2024-001",
-      jobTitle: "Senior React Developer",
-      company: "TechCorp Inc",
-      interviews: [
-        {
-          id: "INT-2024-001",
-          candidateName: "Sarah Johnson",
-          interviewType: "Technical Round",
-          date: "2024-01-25",
-          time: "2:00 PM",
-          status: "Scheduled",
-          skillMatch: 92,
-          panel: ["John Smith", "David Wilson"],
-          medium: "Video Call"
-        },
-        {
-          id: "INT-2024-002", 
-          candidateName: "Mike Chen",
-          interviewType: "HR Interview",
-          date: "2024-01-26",
-          time: "10:00 AM",
-          status: "Completed",
-          skillMatch: 88,
-          panel: ["Lisa Chen"],
-          medium: "In Person"
-        }
-      ]
-    },
-    "JOB-2024-002-InnovateLabs": {
-      jobId: "JOB-2024-002",
-      jobTitle: "Full Stack Engineer",
-      company: "InnovateLabs",
-      interviews: [
-        {
-          id: "INT-2024-003",
-          candidateName: "Emily Rodriguez",
-          interviewType: "Final Round",
-          date: "2024-01-27",
-          time: "3:00 PM", 
-          status: "Scheduled",
-          skillMatch: 95,
-          panel: ["Alex Johnson", "Maria Garcia"],
-          medium: "Video Call"
-        }
-      ]
-    }
-  };
-
   const stages = [
     { id: "scheduled", name: "Scheduled", color: "bg-blue-100 text-blue-800" },
-    { id: "in-progress", name: "In Progress", color: "bg-yellow-100 text-yellow-800" },
+    { id: "in_progress", name: "In Progress", color: "bg-yellow-100 text-yellow-800" },
     { id: "completed", name: "Completed", color: "bg-green-100 text-green-800" },
     { id: "cancelled", name: "Cancelled", color: "bg-red-100 text-red-800" },
+    { id: "no_show", name: "No Show", color: "bg-gray-100 text-gray-800" },
   ];
 
-  const getStageForStatus = (status: string) => {
-    switch (status) {
-      case "Scheduled": return "scheduled";
-      case "In Progress": return "in-progress";
-      case "Completed": return "completed";
-      case "Cancelled": return "cancelled";
-      default: return "scheduled";
-    }
+  const getStageForStatus = (status: InterviewStatus) => {
+    return status;
   };
 
   const toggleJobExpansion = (jobKey: string) => {
@@ -253,19 +314,15 @@ const Interviews = () => {
     return "text-red-600";
   };
 
-  const allInterviews = Object.values(interviewsByJob).flatMap(job => job.interviews);
-  const totalInterviews = allInterviews.length;
-  const totalJobs = Object.keys(interviewsByJob).length;
-  const scheduledInterviews = allInterviews.filter(i => i.status === "Scheduled").length;
-  const completedInterviews = allInterviews.filter(i => i.status === "Completed").length;
 
   const navigationCards = [
     {
       title: "Total Interviews",
-      value: totalInterviews.toString(),
+      value: stats?.totalInterviews?.toString() || totalInterviews.toString(),
       icon: Users,
       color: "text-blue-700",
       gradientOverlay: "bg-gradient-to-br from-blue-400/30 via-blue-500/20 to-blue-600/30",
+      onClick: () => handleClearFilters()
     },
     {
       title: "Active Jobs",
@@ -273,6 +330,7 @@ const Interviews = () => {
       icon: Briefcase,
       color: "text-green-700",
       gradientOverlay: "bg-gradient-to-br from-green-400/30 via-green-500/20 to-green-600/30",
+      onClick: () => handleClearFilters()
     },
     {
       title: "Scheduled",
@@ -280,6 +338,10 @@ const Interviews = () => {
       icon: Clock,
       color: "text-amber-700",
       gradientOverlay: "bg-gradient-to-br from-amber-400/30 via-amber-500/20 to-amber-600/30",
+      onClick: () => {
+        setStatusFilter("scheduled");
+        handleApplyFilters();
+      }
     },
     {
       title: "Completed",
@@ -287,6 +349,10 @@ const Interviews = () => {
       icon: CheckCircle,
       color: "text-purple-700",
       gradientOverlay: "bg-gradient-to-br from-purple-400/30 via-purple-500/20 to-purple-600/30",
+      onClick: () => {
+        setStatusFilter("completed");
+        handleApplyFilters();
+      }
     },
   ];
 
@@ -391,6 +457,110 @@ const Interviews = () => {
 
         {/* Interviews Tab */}
         <TabsContent value="interviews" className="space-y-4">
+          {/* Filters */}
+          <Card className="border-gray-200 shadow-sm bg-white/95 backdrop-blur-sm">
+            <CardContent className="p-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-700 mb-2 block">Search</label>
+                  <Input
+                    placeholder="Search interviews..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700 mb-2 block">Status</label>
+                  <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as InterviewStatus | "")}>
+                    <SelectTrigger className="text-sm">
+                      <SelectValue placeholder="All statuses" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">All statuses</SelectItem>
+                      <SelectItem value="scheduled">Scheduled</SelectItem>
+                      <SelectItem value="in_progress">In Progress</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                      <SelectItem value="no_show">No Show</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700 mb-2 block">Type</label>
+                  <Select value={typeFilter} onValueChange={(value) => setTypeFilter(value as InterviewType | "")}>
+                    <SelectTrigger className="text-sm">
+                      <SelectValue placeholder="All types" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">All types</SelectItem>
+                      <SelectItem value="phone">Phone</SelectItem>
+                      <SelectItem value="video">Video</SelectItem>
+                      <SelectItem value="in_person">In Person</SelectItem>
+                      <SelectItem value="technical">Technical</SelectItem>
+                      <SelectItem value="behavioral">Behavioral</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-end gap-2">
+                  <Button onClick={handleApplyFilters} className="flex-1 text-sm">
+                    <Search className="w-4 h-4 mr-2" />
+                    Apply
+                  </Button>
+                  <Button variant="outline" onClick={handleClearFilters} className="text-sm">
+                    Clear
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Loading State */}
+          {interviewsLoading && (
+            <Card className="border-gray-200 shadow-sm bg-white/95 backdrop-blur-sm">
+              <CardContent className="p-8 text-center">
+                <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
+                <p className="text-gray-600">Loading interviews...</p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Error State */}
+          {interviewsError && (
+            <Card className="border-red-200 shadow-sm bg-red-50/95 backdrop-blur-sm">
+              <CardContent className="p-8 text-center">
+                <AlertCircle className="w-8 h-8 mx-auto mb-4 text-red-600" />
+                <p className="text-red-600 mb-4">{interviewsError}</p>
+                <Button onClick={refreshInterviews} variant="outline">
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Retry
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Empty State */}
+          {!interviewsLoading && !interviewsError && interviews.length === 0 && (
+            <Card className="border-gray-200 shadow-sm bg-white/95 backdrop-blur-sm">
+              <CardContent className="p-8 text-center">
+                <Users className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">No interviews found</h3>
+                <p className="text-gray-600 mb-4">
+                  {statusFilter || typeFilter || searchQuery 
+                    ? "No interviews match your current filters." 
+                    : "No interviews have been scheduled yet."}
+                </p>
+                {(statusFilter || typeFilter || searchQuery) && (
+                  <Button onClick={handleClearFilters} variant="outline">
+                    Clear Filters
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Interviews List */}
+          {!interviewsLoading && !interviewsError && interviews.length > 0 && (
           <Card className="border-gray-200 shadow-sm overflow-hidden bg-white/95 backdrop-blur-sm">
             <CardContent className="p-0 relative">
               <div className="space-y-0 relative">
@@ -457,8 +627,8 @@ const Interviews = () => {
                               <div className="flex items-center gap-4">
                                 <div className="flex flex-col items-center">
                                   <User className="w-8 h-8 text-blue-600 mb-1" />
-                                  <Badge className={`text-xs ${interview.status === 'Completed' ? 'bg-green-100 text-green-800' : interview.status === 'Scheduled' ? 'bg-blue-100 text-blue-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                                    {interview.status}
+                                  <Badge className={`text-xs ${interviewService.getStatusColor(interview.status)}`}>
+                                    {interviewService.getStatusLabel(interview.status)}
                                   </Badge>
                                 </div>
                                 
@@ -469,45 +639,61 @@ const Interviews = () => {
                                            e.stopPropagation();
                                            navigate(`/dashboard/interviews/${interview.id}`);
                                          }}>
-                                       {interview.candidateName}
+                                       {interview.submission?.candidate?.first_name} {interview.submission?.candidate?.last_name}
                                      </h4>
-                                    <Badge variant="outline" className="text-xs">{interview.interviewType}</Badge>
+                                    <Badge variant="outline" className={`text-xs ${interviewService.getTypeColor(interview.interview_type)}`}>
+                                      {interviewService.getTypeLabel(interview.interview_type)}
+                                    </Badge>
                                   </div>
                                   <div className="flex items-center gap-4 text-sm text-gray-600">
                                     <div className="flex items-center gap-1">
                                       <Calendar className="w-3 h-3" />
-                                      {interview.date}
+                                      {interviewService.formatDate(interview.scheduled_at)}
                                     </div>
                                     <div className="flex items-center gap-1">
                                       <Clock className="w-3 h-3" />
-                                      {interview.time}
+                                      {interviewService.formatTime(interview.scheduled_at)}
                                     </div>
                                     <div className="flex items-center gap-1">
-                                      {interview.medium === 'Video Call' ? <Video className="w-3 h-3" /> : <Building className="w-3 h-3" />}
-                                      {interview.medium}
+                                      {interview.interview_type === 'video' ? <Video className="w-3 h-3" /> : 
+                                       interview.interview_type === 'phone' ? <Phone className="w-3 h-3" /> : 
+                                       <Building className="w-3 h-3" />}
+                                      {interview.location || interview.meeting_link ? 
+                                        (interview.interview_type === 'video' ? 'Video Call' : 
+                                         interview.interview_type === 'phone' ? 'Phone Call' : 
+                                         interview.location) : 
+                                        'TBD'}
                                     </div>
+                                    {interview.duration_minutes && (
+                                      <div className="flex items-center gap-1">
+                                        <Clock className="w-3 h-3" />
+                                        {interviewService.formatDuration(interview.duration_minutes)}
+                                      </div>
+                                    )}
                                   </div>
-                                  <div className="flex items-center gap-2 mt-2">
-                                    <span className="text-xs text-gray-500">Panel:</span>
-                                    {interview.panel.map((panelist: string, idx: number) => (
-                                      <Badge key={idx} variant="secondary" className="text-xs">
-                                        {panelist}
+                                  {interview.interviewer && (
+                                    <div className="flex items-center gap-2 mt-2">
+                                      <span className="text-xs text-gray-500">Interviewer:</span>
+                                      <Badge variant="secondary" className="text-xs">
+                                        {interview.interviewer.recruiterProfile?.first_name} {interview.interviewer.recruiterProfile?.last_name}
                                       </Badge>
-                                    ))}
-                                  </div>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                               
                               <div className="flex items-center gap-4">
-                                <div className="text-center">
-                                  <div className="flex items-center gap-1 mb-1">
-                                    <Star className="w-4 h-4 text-yellow-500" />
-                                    <span className="text-xs text-gray-500">Skill Match</span>
+                                {interview.rating && (
+                                  <div className="text-center">
+                                    <div className="flex items-center gap-1 mb-1">
+                                      <Star className="w-4 h-4 text-yellow-500" />
+                                      <span className="text-xs text-gray-500">Rating</span>
+                                    </div>
+                                    <p className="text-lg font-bold text-yellow-600">
+                                      {interviewService.getRatingStars(interview.rating)}
+                                    </p>
                                   </div>
-                                  <p className={`text-lg font-bold ${getScoreColor(interview.skillMatch)}`}>
-                                    {interview.skillMatch}%
-                                  </p>
-                                </div>
+                                )}
                                 
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
@@ -520,19 +706,43 @@ const Interviews = () => {
                                       <Eye className="w-4 h-4 mr-2" />
                                       View Details
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem>
-                                      <Edit className="w-4 h-4 mr-2" />
-                                      Edit Interview
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem>
-                                      <Mail className="w-4 h-4 mr-2" />
-                                      Send Reminder
-                                    </DropdownMenuItem>
+                                    {interviewService.canEdit(interview, user?.role || '') && (
+                                      <DropdownMenuItem>
+                                        <Edit className="w-4 h-4 mr-2" />
+                                        Edit Interview
+                                      </DropdownMenuItem>
+                                    )}
+                                    {interview.status === 'scheduled' && (
+                                      <>
+                                        <DropdownMenuItem onClick={() => handleCompleteInterview(interview.id)}>
+                                          <CheckCircle className="w-4 h-4 mr-2" />
+                                          Mark Complete
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem>
+                                          <Mail className="w-4 h-4 mr-2" />
+                                          Send Reminder
+                                        </DropdownMenuItem>
+                                      </>
+                                    )}
                                     <DropdownMenuSeparator />
-                                    <DropdownMenuItem className="text-red-600">
-                                      <Trash2 className="w-4 h-4 mr-2" />
-                                      Cancel Interview
-                                    </DropdownMenuItem>
+                                    {interviewService.canCancel(interview, user?.role || '') && (
+                                      <DropdownMenuItem 
+                                        className="text-red-600"
+                                        onClick={() => handleCancelInterview(interview.id)}
+                                      >
+                                        <Trash2 className="w-4 h-4 mr-2" />
+                                        Cancel Interview
+                                      </DropdownMenuItem>
+                                    )}
+                                    {user?.role === 'recruiter' && (
+                                      <DropdownMenuItem 
+                                        className="text-red-600"
+                                        onClick={() => handleDeleteInterview(interview.id)}
+                                      >
+                                        <Trash2 className="w-4 h-4 mr-2" />
+                                        Delete Interview
+                                      </DropdownMenuItem>
+                                    )}
                                   </DropdownMenuContent>
                                 </DropdownMenu>
                               </div>
@@ -548,6 +758,59 @@ const Interviews = () => {
               </div>
             </CardContent>
           </Card>
+          )}
+
+          {/* Pagination */}
+          {!interviewsLoading && !interviewsError && interviews.length > 0 && pagination.totalPages > 1 && (
+            <Card className="border-gray-200 shadow-sm bg-white/95 backdrop-blur-sm">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-gray-600">
+                    Showing {((pagination.currentPage - 1) * pagination.itemsPerPage) + 1} to{' '}
+                    {Math.min(pagination.currentPage * pagination.itemsPerPage, pagination.totalItems)} of{' '}
+                    {pagination.totalItems} interviews
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const currentFilters: any = {};
+                        if (statusFilter) currentFilters.status = statusFilter;
+                        if (typeFilter) currentFilters.interview_type = typeFilter;
+                        if (searchQuery) currentFilters.search = searchQuery;
+                        if (dateFrom) currentFilters.date_from = dateFrom.toISOString();
+                        if (dateTo) currentFilters.date_to = dateTo.toISOString();
+                        fetchInterviews({ ...currentFilters, page: pagination.currentPage - 1 });
+                      }}
+                      disabled={!pagination.hasPrevPage}
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-sm text-gray-600">
+                      Page {pagination.currentPage} of {pagination.totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const currentFilters: any = {};
+                        if (statusFilter) currentFilters.status = statusFilter;
+                        if (typeFilter) currentFilters.interview_type = typeFilter;
+                        if (searchQuery) currentFilters.search = searchQuery;
+                        if (dateFrom) currentFilters.date_from = dateFrom.toISOString();
+                        if (dateTo) currentFilters.date_to = dateTo.toISOString();
+                        fetchInterviews({ ...currentFilters, page: pagination.currentPage + 1 });
+                      }}
+                      disabled={!pagination.hasNextPage}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {/* Todos Tab */}

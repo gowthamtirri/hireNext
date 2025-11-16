@@ -42,6 +42,9 @@ import {
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { DocumentsManager, Document } from "@/components/DocumentsManager";
 import CandidateDetailPersonalizationSettings from "@/components/CandidateDetailPersonalizationSettings";
+import { candidateSearchService } from "@/services/candidateSearchService";
+import { useToast } from "@/hooks/use-toast";
+import { Loader2 } from "lucide-react";
 
 // Mock candidate data - in real app this would come from API
 const candidateData = {
@@ -197,7 +200,13 @@ const candidateData = {
 const CandidateDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const candidate = candidateData[id as keyof typeof candidateData];
+  const { toast } = useToast();
+  
+  // All state hooks must be called before any conditional returns
+  const [candidate, setCandidate] = useState<any>(null);
+  const [submissions, setSubmissions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
   
   // Search functionality state
@@ -207,6 +216,117 @@ const CandidateDetail = () => {
   // Personalization settings state
   const [isPersonalizationOpen, setIsPersonalizationOpen] = useState(false);
   const [personalizationSettings, setPersonalizationSettings] = useState(null);
+
+  // Mock notes with enhanced data - moved to top to avoid conditional hooks
+  const [notes, setNotes] = useState([
+    { id: 1, date: "2024-01-20", author: "Sarah Johnson", content: "Had a great conversation about React best practices. Very knowledgeable about performance optimization.", category: "technical", priority: "high" },
+    { id: 2, date: "2024-01-18", author: "Mike Rodriguez", content: "Technical interview went well. Candidate demonstrated strong problem-solving skills.", category: "interview", priority: "medium" },
+    { id: 3, date: "2024-01-15", author: "Emma Davis", content: "Initial screening completed. Candidate is very interested in remote opportunities.", category: "general", priority: "low" }
+  ]);
+
+  // Notes filter and sort state
+  const [notesFilter, setNotesFilter] = useState("all");
+  const [notesSort, setNotesSort] = useState("newest");
+  const [notesSearch, setNotesSearch] = useState("");
+
+  // Mock tasks
+  const [tasks, setTasks] = useState([
+    { id: 1, title: "Schedule technical interview", status: "pending", priority: "high", assignee: "Sarah Johnson", dueDate: "2024-01-25", category: "interview", createdDate: "2024-01-20" },
+    { id: 2, title: "Send reference check email", status: "completed", priority: "medium", assignee: "Mike Rodriguez", dueDate: "2024-01-22", category: "verification", createdDate: "2024-01-18" },
+    { id: 3, title: "Review portfolio projects", status: "in-progress", priority: "low", assignee: "Emma Davis", dueDate: "2024-01-24", category: "review", createdDate: "2024-01-15" }
+  ]);
+
+  // Tasks filter and sort state
+  const [tasksFilter, setTasksFilter] = useState("all");
+  const [tasksSort, setTasksSort] = useState("dueDate");
+  const [tasksSearch, setTasksSearch] = useState("");
+
+  // Mock todos
+  const [todos, setTodos] = useState([
+    { id: 1, title: "Update candidate profile", completed: false, priority: "high", category: "administrative", dueDate: "2024-01-25", createdDate: "2024-01-20" },
+    { id: 2, title: "Follow up on salary expectations", completed: true, priority: "medium", category: "negotiation", dueDate: "2024-01-22", createdDate: "2024-01-18" },
+    { id: 3, title: "Prepare interview questions", completed: false, priority: "low", category: "preparation", dueDate: "2024-01-24", createdDate: "2024-01-15" }
+  ]);
+
+  // Todos filter and sort state
+  const [todosFilter, setTodosFilter] = useState("all");
+  const [todosSort, setTodosSort] = useState("dueDate");
+  const [todosSearch, setTodosSearch] = useState("");
+
+  // Mock documents with expiration tracking (will be replaced by backend data)
+  const [candidateDocuments, setCandidateDocuments] = useState<Document[]>([
+    {
+      id: 1,
+      name: "Resume.pdf",
+      type: "PDF",
+      uploadDate: "2024-01-05T10:00:00Z",
+      uploadedBy: "Jack Collins",
+      size: "245 KB",
+      validFrom: "2024-01-05T00:00:00Z",
+      validTo: "2025-01-05T00:00:00Z",
+      description: "Latest updated resume"
+    },
+    {
+      id: 2,
+      name: "Cover_Letter.pdf",
+      type: "PDF",
+      uploadDate: "2024-01-05T10:15:00Z",
+      uploadedBy: "Jack Collins",
+      size: "98 KB",
+      validFrom: "2024-01-05T00:00:00Z",
+      validTo: "2024-12-31T00:00:00Z",
+      description: "Cover letter for current applications"
+    },
+    {
+      id: 3,
+      name: "AWS_Certificate.pdf",
+      type: "PDF",
+      uploadDate: "2023-06-15T00:00:00Z",
+      uploadedBy: "Jack Collins",
+      size: "156 KB",
+      validFrom: "2023-06-15T00:00:00Z",
+      validTo: "2024-06-15T00:00:00Z",
+      description: "AWS Certified Developer certificate"
+    },
+    {
+      id: 4,
+      name: "Background_Check.pdf",
+      type: "PDF",
+      uploadDate: "2024-01-10T00:00:00Z",
+      uploadedBy: "HR Team",
+      size: "89 KB",
+      validFrom: "2024-01-10T00:00:00Z",
+      validTo: "2024-02-28T00:00:00Z",
+      description: "Background verification document"
+    }
+  ]);
+
+  // Fetch candidate data from API
+  useEffect(() => {
+    const fetchCandidateData = async () => {
+      if (!id) return;
+      
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await candidateSearchService.getCandidateDetails(id);
+        setCandidate(response.data.candidate);
+        setSubmissions(response.data.submissions || []);
+      } catch (err: any) {
+        console.error('Error fetching candidate:', err);
+        setError(err.response?.data?.message || 'Failed to load candidate details');
+        toast({
+          title: "Error",
+          description: "Failed to load candidate details",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCandidateData();
+  }, [id, toast]);
 
   // Load personalization settings from localStorage on component mount
   useEffect(() => {
@@ -251,54 +371,41 @@ const CandidateDetail = () => {
     }
   };
 
-  // Mock submissions data
-  const submissions = [
-    { id: 1, jobTitle: "Senior React Developer", company: "TechCorp", status: "Interview", submittedDate: "2024-01-15", stage: "Technical Round" },
-    { id: 2, jobTitle: "Frontend Lead", company: "StartupXYZ", status: "Under Review", submittedDate: "2024-01-10", stage: "Initial Review" },
-    { id: 3, jobTitle: "Full Stack Developer", company: "InnovateCo", status: "Shortlisted", submittedDate: "2024-01-08", stage: "HR Screen" }
-  ];
+  // Loading and error states
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="flex items-center space-x-2">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <span>Loading candidate details...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !candidate) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold mb-2">Candidate Not Found</h2>
+          <p className="text-muted-foreground mb-4">
+            {error || "The candidate you're looking for doesn't exist or you don't have permission to view it."}
+          </p>
+          <Button onClick={() => navigate('/dashboard/candidates')}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Candidates
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   // Mock interview history
   const interviews = [
     { id: 1, jobTitle: "Senior React Developer", company: "TechCorp", date: "2024-01-18", type: "Technical", status: "Completed", feedback: "Strong technical skills, good problem-solving approach" },
     { id: 2, jobTitle: "Frontend Lead", company: "StartupXYZ", date: "2024-01-12", type: "HR Screen", status: "Completed", feedback: "Great cultural fit, enthusiastic about the role" }
   ];
-
-  // Mock notes with enhanced data
-  const [notes, setNotes] = useState([
-    { id: 1, date: "2024-01-20", author: "Sarah Johnson", content: "Had a great conversation about React best practices. Very knowledgeable about performance optimization.", category: "technical", priority: "high" },
-    { id: 2, date: "2024-01-18", author: "Mike Rodriguez", content: "Technical interview went well. Candidate demonstrated strong problem-solving skills.", category: "interview", priority: "medium" },
-    { id: 3, date: "2024-01-15", author: "Emma Davis", content: "Initial screening completed. Candidate is very interested in remote opportunities.", category: "general", priority: "low" }
-  ]);
-
-  // Notes filter and sort state
-  const [notesFilter, setNotesFilter] = useState("all");
-  const [notesSort, setNotesSort] = useState("newest");
-  const [notesSearch, setNotesSearch] = useState("");
-
-  // Mock tasks
-  const [tasks, setTasks] = useState([
-    { id: 1, title: "Schedule technical interview", status: "pending", priority: "high", assignee: "Sarah Johnson", dueDate: "2024-01-25", category: "interview", createdDate: "2024-01-20" },
-    { id: 2, title: "Send reference check email", status: "completed", priority: "medium", assignee: "Mike Rodriguez", dueDate: "2024-01-22", category: "verification", createdDate: "2024-01-18" },
-    { id: 3, title: "Review portfolio projects", status: "in-progress", priority: "low", assignee: "Emma Davis", dueDate: "2024-01-24", category: "review", createdDate: "2024-01-15" }
-  ]);
-
-  // Tasks filter and sort state
-  const [tasksFilter, setTasksFilter] = useState("all");
-  const [tasksSort, setTasksSort] = useState("dueDate");
-  const [tasksSearch, setTasksSearch] = useState("");
-
-  // Mock todos
-  const [todos, setTodos] = useState([
-    { id: 1, title: "Update candidate profile", completed: false, priority: "high", category: "administrative", dueDate: "2024-01-25", createdDate: "2024-01-20" },
-    { id: 2, title: "Follow up on salary expectations", completed: true, priority: "medium", category: "negotiation", dueDate: "2024-01-22", createdDate: "2024-01-18" },
-    { id: 3, title: "Prepare interview questions", completed: false, priority: "low", category: "preparation", dueDate: "2024-01-24", createdDate: "2024-01-15" }
-  ]);
-
-  // Todos filter and sort state
-  const [todosFilter, setTodosFilter] = useState("all");
-  const [todosSort, setTodosSort] = useState("dueDate");
-  const [todosSearch, setTodosSearch] = useState("");
 
   // Filter and sort functions
   const getFilteredAndSortedNotes = () => {
@@ -372,54 +479,7 @@ const CandidateDetail = () => {
     });
   };
 
-  // Mock documents with expiration tracking
-  const [candidateDocuments, setCandidateDocuments] = useState<Document[]>([
-    {
-      id: 1,
-      name: "Resume.pdf",
-      type: "PDF",
-      uploadDate: "2024-01-05T10:00:00Z",
-      uploadedBy: "Jack Collins",
-      size: "245 KB",
-      validFrom: "2024-01-05T00:00:00Z",
-      validTo: "2025-01-05T00:00:00Z",
-      description: "Latest updated resume"
-    },
-    {
-      id: 2,
-      name: "Cover_Letter.pdf",
-      type: "PDF",
-      uploadDate: "2024-01-05T10:15:00Z",
-      uploadedBy: "Jack Collins",
-      size: "98 KB",
-      validFrom: "2024-01-05T00:00:00Z",
-      validTo: "2024-12-31T00:00:00Z",
-      description: "Cover letter for current applications"
-    },
-    {
-      id: 3,
-      name: "AWS_Certificate.pdf",
-      type: "PDF",
-      uploadDate: "2023-06-15T00:00:00Z",
-      uploadedBy: "Jack Collins",
-      size: "156 KB",
-      validFrom: "2023-06-15T00:00:00Z",
-      validTo: "2024-06-15T00:00:00Z",
-      description: "AWS Certified Developer certificate"
-    },
-    {
-      id: 4,
-      name: "Background_Check.pdf",
-      type: "PDF",
-      uploadDate: "2024-01-10T00:00:00Z",
-      uploadedBy: "HR Team",
-      size: "89 KB",
-      validFrom: "2024-01-10T00:00:00Z",
-      validTo: "2024-02-28T00:00:00Z",
-      description: "Background verification document"
-    }
-  ]);
-
+  // Document upload handler
   const handleDocumentUpload = (newDocument: Omit<Document, 'id'>) => {
     const documentWithId = {
       ...newDocument,
@@ -547,16 +607,20 @@ const CandidateDetail = () => {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-3 mb-3">
                   <CardTitle className="text-3xl bg-gradient-to-r from-green-700 to-green-600 bg-clip-text text-transparent">
-                    {candidate.name}
+                    {candidate.first_name} {candidate.last_name}
                   </CardTitle>
-                  <Badge className={`${getStatusColor(candidate.status)} border font-medium`}>
-                    {candidate.status}
+                  <Badge className={`${candidateSearchService.getAvailabilityColor(candidate.availability_status)} border font-medium`}>
+                    {candidateSearchService.getAvailabilityLabel(candidate.availability_status)}
                   </Badge>
                 </div>
                 
                 <div className="flex items-center gap-6 text-sm text-gray-600 mb-4 flex-wrap">
-                  <span className="font-medium whitespace-nowrap">{candidate.title}</span>
-                  <span className="font-medium whitespace-nowrap">{candidate.experience} Experience</span>
+                  <span className="font-medium whitespace-nowrap">
+                    {candidate.experiences?.[0]?.job_title || "No title specified"}
+                  </span>
+                  <span className="font-medium whitespace-nowrap">
+                    {candidateSearchService.formatExperience(candidate.experience_years)}
+                  </span>
                 </div>
 
                 <div className="flex items-center gap-3 text-sm text-gray-600 flex-wrap">

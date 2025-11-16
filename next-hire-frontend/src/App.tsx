@@ -51,6 +51,7 @@ import JobMarketplace from "./pages/JobMarketplace";
 import MyRelationships from "./pages/MyRelationships";
 import SignupCandidate from "./pages/SignupCandidate";
 import SignupVendor from "./pages/SignupVendor";
+import JobDetailNew from "./pages/JobDetailNew";
 
 const queryClient = new QueryClient();
 
@@ -77,6 +78,10 @@ const App = () => (
 
             {/* Role Selection Route */}
             <Route path="/role-selection" element={<RoleSelection />} />
+
+            {/* Public Job Routes */}
+            <Route path="/jobs" element={<JobSearch />} />
+            <Route path="/job/:id" element={<JobDetailNew />} />
 
             {/* Redirect root to login */}
             <Route path="/" element={<Navigate to="/auth/login" replace />} />

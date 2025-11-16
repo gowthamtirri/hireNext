@@ -1,7 +1,35 @@
-
 import { NavLink, useLocation } from "react-router-dom";
-import { Home, Briefcase, FileText, Trophy, Users, UserCheck, ChevronRight, Plus, Search, Calendar, Mail, Clock, BarChart3, Ticket, Settings, Heart, MapPin } from "lucide-react";
-import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarHeader, useSidebar } from "@/components/ui/sidebar";
+import {
+  Home,
+  Briefcase,
+  FileText,
+  Trophy,
+  Users,
+  UserCheck,
+  ChevronRight,
+  Plus,
+  Search,
+  Calendar,
+  Mail,
+  Clock,
+  BarChart3,
+  Ticket,
+  Settings,
+  Heart,
+  MapPin,
+} from "lucide-react";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarHeader,
+  useSidebar,
+} from "@/components/ui/sidebar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect } from "react";
 
@@ -9,81 +37,81 @@ const candidateMenuItems = [
   {
     title: "My Profile",
     url: "/dashboard/profile",
-    icon: UserCheck
+    icon: UserCheck,
   },
   {
     title: "Job Marketplace",
     url: "/dashboard/job-marketplace",
-    icon: MapPin
+    icon: MapPin,
   },
   {
     title: "Job Search",
     url: "/dashboard/job-search",
-    icon: Search
+    icon: Search,
   },
   {
     title: "My Submissions",
     url: "/dashboard/my-submissions",
-    icon: FileText
+    icon: FileText,
   },
   {
     title: "My Placements",
     url: "/dashboard/my-placements",
-    icon: Trophy
+    icon: Trophy,
   },
-  {
-    title: "Time Sheets",
-    url: "/dashboard/time-sheets",
-    icon: Clock
-  },
-  {
-    title: "Tickets",
-    url: "/dashboard/tickets",
-    icon: Ticket
-  }
+  // {
+  //   title: "Time Sheets",
+  //   url: "/dashboard/time-sheets",
+  //   icon: Clock
+  // },
+  // {
+  //   title: "Tickets",
+  //   url: "/dashboard/tickets",
+  //   icon: Ticket
+  // }
 ];
 
 const vendorMenuItems = [
   {
     title: "Dashboard",
     url: "/dashboard",
-    icon: Home
+    icon: Home,
   },
   {
     title: "My Profile",
     url: "/dashboard/profile",
-    icon: UserCheck
+    icon: UserCheck,
   },
   {
     title: "Job Marketplace",
     url: "/dashboard/job-marketplace",
-    icon: MapPin
+    icon: MapPin,
   },
   {
     title: "Job Search",
     url: "/dashboard/job-search",
-    icon: Search
+    icon: Search,
   },
   {
     title: "My Submissions",
     url: "/dashboard/my-submissions",
-    icon: FileText
+    icon: FileText,
   },
   {
     title: "My Placements",
     url: "/dashboard/my-placements",
-    icon: Trophy
+    icon: Trophy,
   },
-  {
-    title: "Time Sheets",
-    url: "/dashboard/time-sheets",
-    icon: Clock
-  },
-  {
-    title: "Tickets",
-    url: "/dashboard/tickets",
-    icon: Ticket
-  }
+  // {
+  //   title: "Time Sheets",
+  //   url: "/dashboard/time-sheets",
+  //   icon: Clock,
+  // },
+  // {
+  //   title: "Tickets",
+  //   url: "/dashboard/tickets",
+  //   icon: Ticket,
+  // },
 ];
 
 const quickLinks = [];
@@ -93,23 +121,25 @@ export function CandidateVendorSidebar() {
   const isCollapsed = state === "collapsed";
   const location = useLocation();
   const { user } = useAuth();
-  
-  const menuItems = user?.role === 'candidate' ? candidateMenuItems : vendorMenuItems;
-  const roleLabel = user?.role === 'candidate' ? 'Candidate Portal' : 'Vendor Portal';
-  const isVendor = user?.role === 'vendor';
-  const isCandidate = user?.role === 'candidate';
+
+  const menuItems =
+    user?.role === "candidate" ? candidateMenuItems : vendorMenuItems;
+  const roleLabel =
+    user?.role === "candidate" ? "Candidate Portal" : "Vendor Portal";
+  const isVendor = user?.role === "vendor";
+  const isCandidate = user?.role === "candidate";
 
   // Apply theme class to body
   useEffect(() => {
-    document.body.classList.remove('vendor-theme', 'candidate-theme');
+    document.body.classList.remove("vendor-theme", "candidate-theme");
     if (isVendor) {
-      document.body.classList.add('vendor-theme');
+      document.body.classList.add("vendor-theme");
     } else if (isCandidate) {
-      document.body.classList.add('candidate-theme');
+      document.body.classList.add("candidate-theme");
     }
-    
+
     return () => {
-      document.body.classList.remove('vendor-theme', 'candidate-theme');
+      document.body.classList.remove("vendor-theme", "candidate-theme");
     };
   }, [isVendor, isCandidate]);
 
@@ -177,16 +207,16 @@ export function CandidateVendorSidebar() {
   };
 
   const getActiveIconColor = () => {
-    return 'text-white';
+    return "text-white";
   };
 
   const getInactiveIconColor = () => {
     if (isVendor) {
-      return 'text-vendor-600';
+      return "text-vendor-600";
     } else if (isCandidate) {
-      return 'text-candidate-600';
+      return "text-candidate-600";
     }
-    return 'text-green-600';
+    return "text-green-600";
   };
 
   const getActiveOverlayClasses = () => {
@@ -206,7 +236,7 @@ export function CandidateVendorSidebar() {
     }
     return "text-green-700/80 font-semibold text-xs uppercase tracking-wider mb-3";
   };
-  
+
   return (
     <Sidebar className={getSidebarClasses()} collapsible="icon">
       <SidebarHeader className={getHeaderClasses()}>
@@ -224,14 +254,17 @@ export function CandidateVendorSidebar() {
           </div>
         </div>
       </SidebarHeader>
-      
+
       <SidebarContent className="flex flex-col px-2 py-4">
         {/* Main Navigation */}
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu className="space-y-2">
               {menuItems.map((item) => {
-                const isActive = location.pathname === item.url || (item.url !== "/dashboard" && location.pathname.startsWith(item.url));
+                const isActive =
+                  location.pathname === item.url ||
+                  (item.url !== "/dashboard" &&
+                    location.pathname.startsWith(item.url));
                 return (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton asChild>
@@ -246,11 +279,21 @@ export function CandidateVendorSidebar() {
                         {isActive && (
                           <div className={getActiveOverlayClasses()} />
                         )}
-                        <item.icon className={`w-5 h-5 relative z-10 ${isActive ? getActiveIconColor() : getInactiveIconColor()}`} />
+                        <item.icon
+                          className={`w-5 h-5 relative z-10 ${
+                            isActive
+                              ? getActiveIconColor()
+                              : getInactiveIconColor()
+                          }`}
+                        />
                         {!isCollapsed && (
                           <>
-                            <span className="font-medium relative z-10">{item.title}</span>
-                            {isActive && <ChevronRight className="w-4 h-4 ml-auto relative z-10 text-white/80" />}
+                            <span className="font-medium relative z-10">
+                              {item.title}
+                            </span>
+                            {isActive && (
+                              <ChevronRight className="w-4 h-4 ml-auto relative z-10 text-white/80" />
+                            )}
                           </>
                         )}
                       </NavLink>
@@ -266,7 +309,9 @@ export function CandidateVendorSidebar() {
           <>
             <div className="flex-1" />
             <SidebarGroup>
-              <SidebarGroupLabel className={getGroupLabelClasses()}>Quick Actions</SidebarGroupLabel>
+              <SidebarGroupLabel className={getGroupLabelClasses()}>
+                Quick Actions
+              </SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu className="space-y-2">
                   {quickLinks.map((item) => {
@@ -282,8 +327,16 @@ export function CandidateVendorSidebar() {
                                 : "text-gray-600 hover:bg-gradient-to-r hover:from-emerald-50 hover:to-green-50 hover:text-emerald-700 hover:shadow-sm"
                             }`}
                           >
-                            <item.icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-emerald-600'}`} />
-                            {!isCollapsed && <span className="text-sm font-medium">{item.title}</span>}
+                            <item.icon
+                              className={`w-4 h-4 ${
+                                isActive ? "text-white" : "text-emerald-600"
+                              }`}
+                            />
+                            {!isCollapsed && (
+                              <span className="text-sm font-medium">
+                                {item.title}
+                              </span>
+                            )}
                           </NavLink>
                         </SidebarMenuButton>
                       </SidebarMenuItem>

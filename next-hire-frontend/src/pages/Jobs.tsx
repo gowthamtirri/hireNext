@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { DataGrid } from "@/components/ui/data-grid";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,395 +40,459 @@ import {
   Import,
   PenTool,
   Pencil,
+  Search,
+  Filter,
+  RefreshCw,
+  ExternalLink,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import jobsData from "@/data/jobs.json";
+import { useJobs } from "@/hooks/useJobs";
+import { useAuth } from "@/contexts/AuthContext";
+import { jobService } from "@/services/jobService";
+import { toast } from "sonner";
 
 const Jobs = () => {
   const navigate = useNavigate();
-  const { jobs } = jobsData;
-  const [activeFilters, setActiveFilters] = useState<Record<string, string[]>>({});
-  const [editMode, setEditMode] = useState(false);
+  const { user } = useAuth();
+  const { 
+    jobs, 
+    loading, 
+    error, 
+    pagination, 
+    filters, 
+    searchJobs, 
+    deleteJob,
+    refresh,
+    setFilters 
+  } = useJobs();
 
-  const myJobs = jobs.filter(job => job.assignedTo === "Mike Johnson" || job.accountManager === "Mike Johnson").length;
-  const activeJobs = jobs.filter(job => job.jobStatus === "Active").length;
-  const onHoldJobs = jobs.filter(job => job.jobStatus === "On Hold").length;
-  const totalSubmissions = jobs.reduce((sum, job) => sum + job.submissions, 0);
-  const highPriorityJobs = jobs.filter(job => job.priority === "High").length;
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [priorityFilter, setPriorityFilter] = useState("all");
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
-  const handleMyJobsClick = () => {
-    setActiveFilters({
-      assignedTo: ["Mike Johnson"],
-      accountManager: ["Mike Johnson"]
-    });
+  // Calculate stats from current jobs
+  const stats = {
+    myJobs: jobs.length,
+    activeJobs: jobs.filter(job => job.status === "active").length,
+    draftJobs: jobs.filter(job => job.status === "draft").length,
+    pausedJobs: jobs.filter(job => job.status === "paused").length,
+    totalSubmissions: jobs.reduce((sum, job) => sum + (job.submission_count || 0), 0),
+    highPriorityJobs: jobs.filter(job => job.priority === "high").length,
   };
 
-  const handleActiveJobsClick = () => {
-    setActiveFilters({
-      jobStatus: ["Active"]
-    });
+  const handleSearch = () => {
+    const newFilters = {
+      ...filters,
+      search: searchTerm,
+      status: statusFilter === "all" ? undefined : statusFilter,
+      priority: priorityFilter === "all" ? undefined : priorityFilter,
+      page: 1,
+    };
+    searchJobs(newFilters);
   };
 
-  const handleOnHoldClick = () => {
-    setActiveFilters({
-      jobStatus: ["On Hold"]
-    });
-  };
-
-  const handleHighPriorityClick = () => {
-    setActiveFilters({
-      priority: ["High"]
-    });
-  };
-
-  const handleEditModeToggle = () => {
-    setEditMode(!editMode);
-  };
-
-  const navigationCards = [
-    {
-      title: "My Jobs",
-      value: myJobs.toString(),
-      icon: Briefcase,
-      color: "text-green-700",
-      gradientOverlay: "bg-gradient-to-br from-green-400/30 via-green-500/20 to-green-600/30",
-      onClick: handleMyJobsClick
-    },
-    {
-      title: "Active Jobs",
-      value: activeJobs.toString(),
-      icon: CheckCircle,
-      color: "text-emerald-700",
-      gradientOverlay: "bg-gradient-to-br from-emerald-400/30 via-emerald-500/20 to-emerald-600/30",
-      onClick: handleActiveJobsClick
-    },
-    {
-      title: "On Hold",
-      value: onHoldJobs.toString(),
-      icon: Clock,
-      color: "text-amber-700",
-      gradientOverlay: "bg-gradient-to-br from-amber-400/30 via-amber-500/20 to-amber-600/30",
-      onClick: handleOnHoldClick
-    },
-    {
-      title: "Total Submissions",
-      value: totalSubmissions.toString(),
-      icon: FileText,
-      color: "text-purple-700",
-      gradientOverlay: "bg-gradient-to-br from-purple-400/30 via-purple-500/20 to-purple-600/30",
-      onClick: () => navigate("/dashboard/submissions")
-    },
-    {
-      title: "High Priority",
-      value: highPriorityJobs.toString(),
-      icon: AlertCircle,
-      color: "text-red-700",
-      gradientOverlay: "bg-gradient-to-br from-red-400/30 via-red-500/20 to-red-600/30",
-      onClick: handleHighPriorityClick
+  const handleFilterChange = (key: string, value: string) => {
+    if (key === "status") {
+      setStatusFilter(value);
+    } else if (key === "priority") {
+      setPriorityFilter(value);
     }
-  ];
+  };
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'High': return 'bg-red-100 text-red-800 border-red-200';
-      case 'Medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'Low': return 'bg-green-100 text-green-800 border-green-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+  const handleDeleteJob = async (jobId: string) => {
+    if (window.confirm("Are you sure you want to delete this job? This action cannot be undone.")) {
+      const success = await deleteJob(jobId);
+      if (success) {
+        refresh();
+      }
     }
+  };
+
+  const handleEditJob = (jobId: string) => {
+    navigate(`/dashboard/jobs/${jobId}/edit`);
+  };
+
+  const handleViewJob = (jobId: string) => {
+    navigate(`/dashboard/jobs/${jobId}`);
+  };
+
+  const handleViewSubmissions = (jobId: string) => {
+    navigate(`/dashboard/submissions?job_id=${jobId}`);
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Active': return 'bg-green-100 text-green-800 border-green-200';
-      case 'On Hold': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'Closed': return 'bg-gray-100 text-gray-800 border-gray-200';
-      case 'Filled': return 'bg-blue-100 text-blue-800 border-blue-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
+    const colors = {
+      active: "bg-green-100 text-green-800",
+      draft: "bg-gray-100 text-gray-800",
+      paused: "bg-yellow-100 text-yellow-800",
+      closed: "bg-red-100 text-red-800",
+    };
+    return colors[status as keyof typeof colors] || "bg-gray-100 text-gray-800";
   };
 
-  const formatSalary = (salary: string) => {
-    return salary?.includes('$') ? salary : `$${salary}`;
+  const getPriorityColor = (priority: string) => {
+    const colors = {
+      high: "bg-red-100 text-red-800",
+      medium: "bg-yellow-100 text-yellow-800",
+      low: "bg-green-100 text-green-800",
+    };
+    return colors[priority as keyof typeof colors] || "bg-gray-100 text-gray-800";
+  };
+
+  const formatSalary = (min?: number, max?: number) => {
+    if (!min && !max) return "Not specified";
+    if (min && max) return `$${min.toLocaleString()} - $${max.toLocaleString()}`;
+    if (min) return `$${min.toLocaleString()}+`;
+    return `Up to $${max?.toLocaleString()}`;
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString();
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
   };
 
-  const columns = [
-    {
-      field: 'id',
-      headerName: 'Job ID',
-      width: 80,
-      renderCell: (value: number, row: any) => (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            navigate(`/dashboard/jobs/${row.id}`);
-          }}
-          className="text-blue-600 hover:text-blue-800 hover:underline font-medium font-poppins text-xs"
-        >
-          #{value}
-        </button>
-      )
-    },
-    {
-      field: 'jobTitle',
-      headerName: 'Job Title',
-      width: 200,
-      renderCell: (value: string, row: any) => (
-        <div className="flex items-center gap-2">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              navigate(`/dashboard/jobs/${row.id}`);
-            }}
-            className="font-medium text-blue-600 hover:text-blue-800 hover:underline font-poppins text-xs whitespace-nowrap overflow-hidden text-ellipsis text-left flex-1"
-            title={value}
-          >
-            {value}
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              navigate(`/dashboard/jobs/${row.id}?edit=true`);
-            }}
-            className="p-1 hover:bg-gray-100 rounded transition-colors"
-            title="Edit job"
-          >
-            <Pencil className="w-3 h-3 text-gray-500 hover:text-blue-600" />
-          </button>
+  // Load initial data
+  useEffect(() => {
+    console.log("Jobs page useEffect - user role:", user?.role);
+    if (user?.role === "recruiter") {
+      console.log("Loading jobs for recruiter...");
+      searchJobs({ page: 1, limit: 20 });
+    }
+  }, [user?.role]); // Remove searchJobs dependency
+
+  if (user?.role !== "recruiter") {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <AlertCircle className="h-8 w-8 text-red-500 mx-auto mb-2" />
+          <p className="text-gray-600">Access denied. Only recruiters can manage jobs.</p>
         </div>
-      )
-    },
-    {
-      field: 'customer',
-      headerName: 'Company',
-      width: 150,
-      renderCell: (value: string) => (
-        <span className="text-gray-700 font-poppins text-xs whitespace-nowrap overflow-hidden text-ellipsis" title={value}>{value}</span>
-      )
-    },
-    {
-      field: 'assignedTo',
-      headerName: 'Assigned To',
-      width: 120,
-      renderCell: (value: string) => (
-        <span className="text-gray-700 font-poppins text-xs whitespace-nowrap overflow-hidden text-ellipsis" title={value}>{value}</span>
-      )
-    },
-    {
-      field: 'jobStatus',
-      headerName: 'Status',
-      width: 80,
-      renderCell: (value: string) => (
-        <Badge className={`${getStatusColor(value)} border font-medium font-poppins text-xs whitespace-nowrap`}>{value}</Badge>
-      )
-    },
-    {
-      field: 'priority',
-      headerName: 'Priority',
-      width: 80,
-      renderCell: (value: string) => (
-        <Badge className={`${getPriorityColor(value)} border font-medium font-poppins text-xs whitespace-nowrap`}>{value}</Badge>
-      )
-    },
-    {
-      field: 'location',
-      headerName: 'Location',
-      width: 120,
-      renderCell: (value: any, row: any) => (
-        <span className="text-gray-700 font-poppins text-xs whitespace-nowrap overflow-hidden text-ellipsis" title={`${row.state}, USA`}>{row.state}, USA</span>
-      )
-    },
-    {
-      field: 'salary',
-      headerName: 'Salary',
-      width: 100,
-      renderCell: (value: string) => (
-        <span className="text-gray-700 font-medium font-poppins text-xs whitespace-nowrap">{formatSalary(value)}</span>
-      )
-    },
-    {
-      field: 'submissions',
-      headerName: 'Submissions',
-      width: 80,
-      renderCell: (value: number) => (
-        <span className="text-gray-700 font-medium font-poppins text-xs whitespace-nowrap">{value}</span>
-      )
-    },
-    {
-      field: 'createdOn',
-      headerName: 'Date Posted',
-      width: 100,
-      renderCell: (value: string) => (
-        <span className="text-gray-700 font-poppins text-xs whitespace-nowrap">{formatDate(value)}</span>
-      )
-    },
-  ];
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-2 sm:space-y-3 md:space-y-4 px-1 sm:px-0">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-3">
+      <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 font-roboto-slab">
-            Jobs {editMode && <span className="text-orange-600 text-sm">(Edit Mode)</span>}
-          </h1>
+          <h1 className="text-2xl font-bold text-gray-900">Job Management</h1>
+          <p className="text-gray-600">Manage your job postings and track applications</p>
         </div>
-        <div className="flex items-center gap-1 sm:gap-2 w-full sm:w-auto">
-          {editMode && (
-            <Button 
-              onClick={handleEditModeToggle}
-              variant="outline" 
-              size="sm" 
-              className="border-orange-200 hover:bg-orange-50 hover:border-orange-300 text-xs flex-1 sm:flex-none px-2 sm:px-3"
-            >
-              <CheckCircle className="w-3 h-3 mr-1" />
-              <span className="hidden sm:inline">Exit Edit</span>
-            </Button>
-          )}
-          
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="border-green-200 hover:bg-green-50 hover:border-green-300 text-xs flex-1 sm:flex-none px-2 sm:px-3">
-                <Calendar className="w-3 h-3 mr-1" />
-                <span className="hidden sm:inline">Export</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-white border-gray-200 z-50">
-              <DropdownMenuItem>
-                <FileText className="w-4 h-4 mr-2" />
-                Export as PDF
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <FileSpreadsheet className="w-4 h-4 mr-2" />
-                Export as Excel
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <FileSpreadsheet className="w-4 h-4 mr-2" />
-                Export to Google Sheets
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="border-blue-200 hover:bg-blue-50 hover:border-blue-300 text-xs flex-1 sm:flex-none px-2 sm:px-3">
-                <Settings className="w-3 h-3 mr-1" />
-                <span className="hidden sm:inline">Actions</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-white border-gray-200 z-50">
-              <DropdownMenuItem>
-                <Share2 className="w-4 h-4 mr-2" />
-                Post to Job Boards
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <UserCheck className="w-4 h-4 mr-2" />
-                Assign to recruiter
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Activity className="w-4 h-4 mr-2" />
-                Change status
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Trash2 className="w-4 h-4 mr-2" />
-                Mark for deletion
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Users className="w-4 h-4 mr-2" />
-                Send to Vendors
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Mail className="w-4 h-4 mr-2" />
-                Send Hotlist email
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Bot className="w-4 h-4 mr-2" />
-                AI Recruiter
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>
-                <RotateCcw className="w-4 h-4 mr-2" />
-                Mass changes
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button className="button-gradient text-white shadow-lg hover:shadow-xl transition-all duration-300 text-xs flex-1 sm:flex-none px-2 sm:px-3">
-                <Plus className="w-3 h-3 mr-1" />
-                <span className="hidden sm:inline">New Job</span>
-                <span className="sm:hidden">New</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-white border-gray-200 z-50">
-              <DropdownMenuItem>
-                <PenTool className="w-4 h-4 mr-2" />
-                Manual Job
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Import className="w-4 h-4 mr-2" />
-                Import from a file
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Bot className="w-4 h-4 mr-2" />
-                AI Assistant
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Mail className="w-4 h-4 mr-2" />
-                From Email
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+        <Button onClick={() => navigate("/dashboard/jobs/create")} className="flex items-center space-x-2">
+          <Plus className="h-4 w-4" />
+          <span>Create Job</span>
+        </Button>
       </div>
 
-      {/* Navigation Cards - Mobile Optimized */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-1 sm:gap-2">
-        {navigationCards.map((card) => {
-          const IconComponent = card.icon;
-          return (
-            <Card 
-              key={card.title} 
-              className="relative overflow-hidden border-0 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 group cursor-pointer backdrop-blur-xl bg-white/20"
-              onClick={card.onClick}
-            >
-              <div className={`absolute inset-0 ${card.gradientOverlay}`}></div>
-              <div className="absolute inset-0 bg-gradient-to-br from-white/40 via-white/20 to-transparent"></div>
-              <CardContent className="relative p-1.5 sm:p-2">
-                <div className="flex flex-col items-center space-y-1">
-                  <div className="p-1 sm:p-1.5 rounded-full bg-white/30 backdrop-blur-sm shadow-sm group-hover:bg-white/40 transition-all border border-white/20">
-                    <IconComponent className={`h-2.5 w-2.5 sm:h-3 sm:w-3 ${card.color}`} />
-                  </div>
-                  <div className="text-center">
-                    <p className="text-xs font-semibold text-gray-600 font-roboto-slab truncate">{card.title}</p>
-                    <p className="text-xs sm:text-sm font-bold text-gray-900 font-roboto-slab">{card.value}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => handleFilterChange("status", "all")}>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">My Jobs</p>
+                <p className="text-2xl font-bold text-green-700">{stats.myJobs}</p>
+              </div>
+              <Briefcase className="h-8 w-8 text-green-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => handleFilterChange("status", "active")}>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Active Jobs</p>
+                <p className="text-2xl font-bold text-emerald-700">{stats.activeJobs}</p>
+              </div>
+              <CheckCircle className="h-8 w-8 text-emerald-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => handleFilterChange("status", "draft")}>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Draft Jobs</p>
+                <p className="text-2xl font-bold text-gray-700">{stats.draftJobs}</p>
+              </div>
+              <FileText className="h-8 w-8 text-gray-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => handleFilterChange("status", "paused")}>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Paused Jobs</p>
+                <p className="text-2xl font-bold text-yellow-700">{stats.pausedJobs}</p>
+              </div>
+              <Clock className="h-8 w-8 text-yellow-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Applications</p>
+                <p className="text-2xl font-bold text-blue-700">{stats.totalSubmissions}</p>
+              </div>
+              <Users className="h-8 w-8 text-blue-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => handleFilterChange("priority", "high")}>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">High Priority</p>
+                <p className="text-2xl font-bold text-red-700">{stats.highPriorityJobs}</p>
+              </div>
+              <AlertCircle className="h-8 w-8 text-red-600" />
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Data Table - Mobile Optimized */}
-      <Card className="border-gray-200 shadow-sm overflow-hidden">
-        <CardContent className="p-0">
-          <div className="overflow-x-auto min-h-0">
-            <div className="min-w-full">
-              <DataGrid
-                rows={jobs}
-                columns={columns}
-                pageSizeOptions={[5, 10, 25, 50]}
-                checkboxSelection
-                onRowClick={(row) => console.log('Row clicked:', row)}
-                initialFilters={activeFilters}
-              />
+      {/* Search and Filters */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Input
+                  placeholder="Search jobs by title, company, or location..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                  onKeyPress={(e) => e.key === "Enter" && handleSearch()}
+                />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Select value={statusFilter} onValueChange={(value) => handleFilterChange("status", value)}>
+                <SelectTrigger className="w-32">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="draft">Draft</SelectItem>
+                  <SelectItem value="paused">Paused</SelectItem>
+                  <SelectItem value="closed">Closed</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={priorityFilter} onValueChange={(value) => handleFilterChange("priority", value)}>
+                <SelectTrigger className="w-32">
+                  <SelectValue placeholder="Priority" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Priority</SelectItem>
+                  <SelectItem value="high">High</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="low">Low</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Button onClick={handleSearch} variant="default">
+                <Search className="h-4 w-4 mr-2" />
+                Search
+              </Button>
+
+              <Button onClick={refresh} variant="outline" disabled={loading}>
+                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              </Button>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Jobs List */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <span>Jobs ({pagination.totalItems})</span>
+            <div className="flex items-center space-x-2">
+              <Button variant="outline" size="sm">
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                Export
+              </Button>
+            </div>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="space-y-4">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="animate-pulse">
+                  <div className="h-24 bg-gray-200 rounded-lg"></div>
+                </div>
+              ))}
+            </div>
+          ) : error ? (
+            <div className="text-center py-8">
+              <AlertCircle className="h-8 w-8 text-red-500 mx-auto mb-2" />
+              <p className="text-gray-600">{error}</p>
+              <Button onClick={refresh} variant="outline" className="mt-2">
+                Try Again
+              </Button>
+            </div>
+          ) : jobs.length === 0 ? (
+            <div className="text-center py-8">
+              <Briefcase className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+              <p className="text-gray-600">No jobs found</p>
+              <Button onClick={() => navigate("/dashboard/jobs/create")} className="mt-2">
+                Create Your First Job
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {jobs.map((job) => (
+                <div key={job.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-3 mb-2">
+                        <h3 className="text-lg font-semibold text-gray-900">{job.title}</h3>
+                        <Badge className={getStatusColor(job.status)}>
+                          {job.status}
+                        </Badge>
+                        <Badge className={getPriorityColor(job.priority)}>
+                          {job.priority} priority
+                        </Badge>
+                        {job.vendor_eligible && (
+                          <Badge variant="outline">Vendor Eligible</Badge>
+                        )}
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm text-gray-600">
+                        <div className="flex items-center space-x-2">
+                          <Building className="h-4 w-4" />
+                          <span>{job.company_name}</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <MapPin className="h-4 w-4" />
+                          <span>{job.location}</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <DollarSign className="h-4 w-4" />
+                          <span>{formatSalary(job.salary_min, job.salary_max)}</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Users className="h-4 w-4" />
+                          <span>{job.submission_count || 0} applications</span>
+                        </div>
+                      </div>
+
+                      <div className="mt-2 text-sm text-gray-500">
+                        Job ID: {job.job_id} • Created: {formatDate(job.created_at)}
+                        {job.application_deadline && (
+                          <span> • Deadline: {formatDate(job.application_deadline)}</span>
+                        )}
+                      </div>
+
+                      {job.required_skills && job.required_skills.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {job.required_skills.slice(0, 5).map((skill, index) => (
+                            <Badge key={index} variant="secondary" className="text-xs">
+                              {skill}
+                            </Badge>
+                          ))}
+                          {job.required_skills.length > 5 && (
+                            <Badge variant="secondary" className="text-xs">
+                              +{job.required_skills.length - 5} more
+                            </Badge>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleViewJob(job.id)}>
+                          <Eye className="h-4 w-4 mr-2" />
+                          View Details
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleEditJob(job.id)}>
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit Job
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleViewSubmissions(job.id)}>
+                          <Users className="h-4 w-4 mr-2" />
+                          View Applications ({job.submission_count || 0})
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem>
+                          <Share2 className="h-4 w-4 mr-2" />
+                          Share Job
+                        </DropdownMenuItem>
+                        <DropdownMenuItem>
+                          <ExternalLink className="h-4 w-4 mr-2" />
+                          Public View
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem 
+                          onClick={() => handleDeleteJob(job.id)}
+                          className="text-red-600"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete Job
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+              ))}
+
+              {/* Pagination */}
+              {pagination.totalPages > 1 && (
+                <div className="flex items-center justify-between mt-6">
+                  <div className="text-sm text-gray-600">
+                    Showing {((pagination.currentPage - 1) * pagination.itemsPerPage) + 1} to{" "}
+                    {Math.min(pagination.currentPage * pagination.itemsPerPage, pagination.totalItems)} of{" "}
+                    {pagination.totalItems} jobs
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => searchJobs({ ...filters, page: pagination.currentPage - 1 })}
+                      disabled={!pagination.hasPrevPage}
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-sm text-gray-600">
+                      Page {pagination.currentPage} of {pagination.totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => searchJobs({ ...filters, page: pagination.currentPage + 1 })}
+                      disabled={!pagination.hasNextPage}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

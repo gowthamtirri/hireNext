@@ -31,11 +31,15 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { useToast } from "@/hooks/use-toast";
+import { jobService } from "@/services/jobService";
+import { useAuth } from "@/contexts/AuthContext";
 
 const AddNewJob = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [skills, setSkills] = useState<string[]>([]);
   const [secondarySkills, setSecondarySkills] = useState<string[]>([]);
   const [newSkill, setNewSkill] = useState("");
@@ -48,25 +52,25 @@ const AddNewJob = () => {
       jobDescription: "",
       externalJobDescription: "",
       jobType: "",
-      salary: "",
-      priority: "",
-      industry: "",
-      state: "",
+      location: "",
       city: "",
-      minExperience: "",
-      maxExperience: "",
-      numberOfPositions: "1",
-      maxSubmissionsAllowed: "10",
-      taxTerms: "",
-      paymentTerms: "",
-      expensePaid: false,
-      documentsRequired: "",
-      jobStartDate: "",
-      jobEndDate: "",
-      educationQualifications: "",
-      spokenLanguages: "",
-      clientContact: "",
-      clientJobId: ""
+      state: "",
+      country: "US",
+      salaryMin: "",
+      salaryMax: "",
+      salaryCurrency: "USD",
+      experienceMin: "",
+      experienceMax: "",
+      educationRequirements: "",
+      priority: "",
+      jobStatus: "draft",
+      positionsAvailable: "1",
+      maxSubmissionsAllowed: "",
+      vendorEligible: true,
+      remoteWorkAllowed: false,
+      startDate: "",
+      endDate: "",
+      applicationDeadline: ""
     }
   });
 
@@ -95,31 +99,126 @@ const AddNewJob = () => {
     setSkillsArray(currentSkills.filter(skill => skill !== skillToRemove));
   };
 
-  const handleSubmit = (data: any) => {
-    const jobData = {
-      ...data,
-      primarySkills: skills,
-      secondarySkills: secondarySkills,
-      id: Date.now(),
-      jobId: `JOB-${new Date().getFullYear()}-${String(Date.now()).slice(-3)}`,
-      createdBy: "Current User",
-      createdOn: new Date().toISOString(),
-      assignedTo: "Current User",
-      accountManager: "Current User",
-      updatedBy: "Current User",
-      updatedOn: new Date().toISOString(),
-      jobStatus: "Draft",
-      submissions: 0
+  // Helper functions to map form values to API format
+  const mapJobTypeToAPI = (jobType: string) => {
+    const mapping: Record<string, string> = {
+      "Full-time": "full_time",
+      "Part-time": "part_time",
+      "Contract": "contract",
+      "Temporary": "temporary",
+      "Full Time": "full_time",
+      "Part Time": "part_time",
     };
+    return mapping[jobType] || jobType?.toLowerCase().replace(/[\s-]/g, '_');
+  };
 
-    console.log('Creating new job:', jobData);
-    
-    toast({
-      title: "Job Created Successfully!",
-      description: "The new job has been saved and is ready for posting.",
-    });
+  const mapPriorityToAPI = (priority: string) => {
+    const mapping: Record<string, string> = {
+      "High": "high",
+      "Medium": "medium", 
+      "Low": "low",
+    };
+    return mapping[priority] || priority?.toLowerCase();
+  };
 
-    navigate("/dashboard/jobs");
+  const mapStatusToAPI = (status: string) => {
+    const mapping: Record<string, string> = {
+      "Draft": "draft",
+      "Active": "active",
+      "Paused": "paused",
+      "Closed": "closed",
+    };
+    return mapping[status] || status?.toLowerCase();
+  };
+
+  const handleSubmit = async (data: any) => {
+    if (!user) {
+      toast({
+        title: "Error",
+        description: "You must be logged in to create a job.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // Validate required fields
+      if (!data.jobTitle?.trim()) {
+        throw new Error("Job title is required");
+      }
+      if (!data.jobDescription?.trim()) {
+        throw new Error("Job description is required");
+      }
+      if (!data.customer?.trim()) {
+        throw new Error("Company name is required");
+      }
+
+      // Map form data to API format
+      const jobData = {
+        title: data.jobTitle.trim(),
+        description: data.jobDescription.trim(),
+        external_description: data.externalJobDescription?.trim(),
+        company_name: data.customer.trim(),
+        location: data.location?.trim() || "Remote", // Provide default if missing
+        city: data.city?.trim(),
+        state: data.state?.trim(),
+        country: data.country?.trim(),
+        job_type: mapJobTypeToAPI(data.jobType) || "full_time", // Ensure valid job type
+        salary_min: data.salaryMin ? parseFloat(data.salaryMin) : undefined,
+        salary_max: data.salaryMax ? parseFloat(data.salaryMax) : undefined,
+        salary_currency: data.salaryCurrency || "USD",
+        experience_min: data.experienceMin ? parseInt(data.experienceMin) : undefined,
+        experience_max: data.experienceMax ? parseInt(data.experienceMax) : undefined,
+        required_skills: skills.length > 0 ? skills : [],
+        preferred_skills: secondarySkills.length > 0 ? secondarySkills : [],
+        education_requirements: data.educationRequirements?.trim(),
+        status: mapStatusToAPI(data.jobStatus) || "draft",
+        priority: mapPriorityToAPI(data.priority) || "medium",
+        positions_available: data.positionsAvailable ? parseInt(data.positionsAvailable) : 1,
+        vendor_eligible: Boolean(data.vendorEligible),
+        remote_work_allowed: Boolean(data.remoteWorkAllowed),
+        start_date: data.startDate ? new Date(data.startDate).toISOString() : undefined,
+        end_date: data.endDate ? new Date(data.endDate).toISOString() : undefined,
+        application_deadline: data.applicationDeadline ? new Date(data.applicationDeadline).toISOString() : undefined,
+      };
+
+      // Additional validation
+      if (!["full_time", "part_time", "contract", "temporary"].includes(jobData.job_type)) {
+        jobData.job_type = "full_time"; // Default to full_time if invalid
+      }
+      if (!["low", "medium", "high"].includes(jobData.priority)) {
+        jobData.priority = "medium"; // Default to medium if invalid
+      }
+      if (!["draft", "active", "paused", "closed"].includes(jobData.status)) {
+        jobData.status = "draft"; // Default to draft if invalid
+      }
+
+      console.log('Creating new job:', jobData);
+      
+      const response = await jobService.createJob(jobData);
+      
+      if (response.success) {
+        toast({
+          title: "Job Created Successfully!",
+          description: `Job "${jobData.title}" has been created and saved.`,
+        });
+
+        navigate("/dashboard/jobs");
+      } else {
+        throw new Error(response.message || "Failed to create job");
+      }
+    } catch (error: any) {
+      console.error('Error creating job:', error);
+      toast({
+        title: "Error Creating Job",
+        description: error.response?.data?.message || error.message || "An unexpected error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const nextStep = () => {
@@ -215,24 +314,13 @@ const AddNewJob = () => {
 
               <FormField
                 control={form.control}
-                name="industry"
+                name="location"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-gray-700 font-medium">Industry</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger className="border-gray-200 focus:border-green-400">
-                          <SelectValue placeholder="Select industry" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent className="bg-white">
-                        <SelectItem value="Technology">Technology</SelectItem>
-                        <SelectItem value="Finance">Finance</SelectItem>
-                        <SelectItem value="Healthcare">Healthcare</SelectItem>
-                        <SelectItem value="Design">Design</SelectItem>
-                        <SelectItem value="Marketing">Marketing</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <FormLabel className="text-gray-700 font-medium">Location *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g. San Francisco, CA or Remote" className="border-gray-200 focus:border-green-400" {...field} />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -280,19 +368,58 @@ const AddNewJob = () => {
               />
             </div>
 
-            <FormField
-              control={form.control}
-              name="salary"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-gray-700 font-medium">Salary Range</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g. $120k - $150k" className="border-gray-200 focus:border-green-400" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <FormField
+                control={form.control}
+                name="salaryMin"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-gray-700 font-medium">Min Salary</FormLabel>
+                    <FormControl>
+                      <Input type="number" placeholder="e.g. 120000" className="border-gray-200 focus:border-green-400" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="salaryMax"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-gray-700 font-medium">Max Salary</FormLabel>
+                    <FormControl>
+                      <Input type="number" placeholder="e.g. 150000" className="border-gray-200 focus:border-green-400" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="salaryCurrency"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-gray-700 font-medium">Currency</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger className="border-gray-200 focus:border-green-400">
+                          <SelectValue placeholder="Select currency" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent className="bg-white">
+                        <SelectItem value="USD">USD</SelectItem>
+                        <SelectItem value="EUR">EUR</SelectItem>
+                        <SelectItem value="GBP">GBP</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
           </div>
         );
 
@@ -752,10 +879,11 @@ const AddNewJob = () => {
               ) : (
                 <Button
                   type="submit"
-                  className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white shadow-md"
+                  disabled={isSubmitting}
+                  className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white shadow-md disabled:opacity-50"
                 >
                   <Save className="w-4 h-4 mr-2" />
-                  Create Job
+                  {isSubmitting ? "Creating Job..." : "Create Job"}
                 </Button>
               )}
             </div>

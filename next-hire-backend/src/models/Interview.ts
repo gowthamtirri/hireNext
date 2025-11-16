@@ -7,11 +7,12 @@ export interface InterviewAttributes {
   id: string;
   submission_id: string;
   interviewer_id: string;
-  interview_type: "phone" | "video" | "in_person" | "technical";
+  interview_type: "phone" | "video" | "in_person" | "technical" | "behavioral";
   scheduled_at: Date;
   duration_minutes: number;
-  location?: string; // Physical location or meeting link
-  status: "scheduled" | "completed" | "cancelled" | "no_show";
+  location?: string; // Physical location
+  meeting_link?: string; // Video meeting link
+  status: "scheduled" | "in_progress" | "completed" | "cancelled" | "no_show";
   notes?: string;
   rating?: number; // 1-5 rating
   feedback?: string;
@@ -33,11 +34,12 @@ export class Interview
   public id!: string;
   public submission_id!: string;
   public interviewer_id!: string;
-  public interview_type!: "phone" | "video" | "in_person" | "technical";
+  public interview_type!: "phone" | "video" | "in_person" | "technical" | "behavioral";
   public scheduled_at!: Date;
   public duration_minutes!: number;
   public location?: string;
-  public status!: "scheduled" | "completed" | "cancelled" | "no_show";
+  public meeting_link?: string;
+  public status!: "scheduled" | "in_progress" | "completed" | "cancelled" | "no_show";
   public notes?: string;
   public rating?: number;
   public feedback?: string;
@@ -78,7 +80,7 @@ Interview.init(
       },
     },
     interview_type: {
-      type: DataTypes.ENUM("phone", "video", "in_person", "technical"),
+      type: DataTypes.ENUM("phone", "video", "in_person", "technical", "behavioral"),
       allowNull: false,
     },
     scheduled_at: {
@@ -98,8 +100,12 @@ Interview.init(
       type: DataTypes.STRING,
       allowNull: true,
     },
+    meeting_link: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
     status: {
-      type: DataTypes.ENUM("scheduled", "completed", "cancelled", "no_show"),
+      type: DataTypes.ENUM("scheduled", "in_progress", "completed", "cancelled", "no_show"),
       allowNull: false,
       defaultValue: "scheduled",
     },

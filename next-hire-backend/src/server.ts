@@ -19,6 +19,12 @@ import recruiterRoutes from "./routes/recruiter";
 import vendorRoutes from "./routes/vendor";
 import jobRoutes from "./routes/jobs";
 import submissionRoutes from "./routes/submissions";
+import experienceRoutes from "./routes/experience";
+import skillsRoutes from "./routes/skills";
+import candidateSearchRoutes from "./routes/candidateSearch";
+import interviewRoutes from "./routes/interviews";
+import placementRoutes from "./routes/placements";
+import dashboardRoutes from "./routes/dashboard";
 
 // Load environment variables
 dotenv.config();
@@ -79,6 +85,12 @@ app.use(`/api/${API_VERSION}/recruiter`, recruiterRoutes);
 app.use(`/api/${API_VERSION}/vendor`, vendorRoutes);
 app.use(`/api/${API_VERSION}/jobs`, jobRoutes);
 app.use(`/api/${API_VERSION}/submissions`, submissionRoutes);
+app.use(`/api/${API_VERSION}/experience`, experienceRoutes);
+app.use(`/api/${API_VERSION}/skills`, skillsRoutes);
+app.use(`/api/${API_VERSION}/candidate-search`, candidateSearchRoutes);
+app.use(`/api/${API_VERSION}/interviews`, interviewRoutes);
+app.use(`/api/${API_VERSION}/placements`, placementRoutes);
+app.use(`/api/${API_VERSION}/dashboard`, dashboardRoutes);
 
 // Error handling middleware
 app.use(notFoundHandler);

@@ -1,0 +1,417 @@
+import { useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
+import { 
+  MapPin, 
+  DollarSign, 
+  Calendar, 
+  Users, 
+  Building2,
+  Briefcase,
+  Clock,
+  ArrowLeft,
+  Share2,
+  Heart,
+  Loader2,
+  CheckCircle,
+  AlertCircle
+} from "lucide-react";
+import { useJob } from "@/hooks/useJobs";
+import { useSubmissionManagement } from "@/hooks/useSubmissions";
+import { useAuth } from "@/contexts/AuthContext";
+import { jobService } from "@/services/jobService";
+import { toast } from "sonner";
+
+export default function JobDetail() {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  
+  // Application state
+  const [isApplying, setIsApplying] = useState(false);
+  const [coverLetter, setCoverLetter] = useState("");
+  const [expectedSalary, setExpectedSalary] = useState("");
+  const [availabilityDate, setAvailabilityDate] = useState("");
+
+  // Hooks
+  const { job, loading, error } = useJob(id || null, true);
+  const { applyToJob, loading: applying } = useSubmissionManagement();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-green-50/50">
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin text-green-600" />
+            <span className="ml-2 text-gray-600">Loading job details...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !job) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-green-50/50">
+        <div className="container mx-auto px-4 py-8">
+          <Card>
+            <CardContent className="p-12 text-center">
+              <AlertCircle className="w-16 h-16 text-red-300 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Job not found</h3>
+              <p className="text-gray-600 mb-4">
+                The job you're looking for doesn't exist or has been removed.
+              </p>
+              <Button onClick={() => navigate("/jobs")} variant="outline">
+                Browse All Jobs
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  const handleApply = async () => {
+    if (!user) {
+      toast.error("Please login to apply for jobs");
+      navigate("/auth/login");
+      return;
+    }
+
+    if (user.role !== "candidate") {
+      toast.error("Only candidates can apply to jobs");
+      return;
+    }
+
+    // For now, we'll need to get the candidate ID from the user profile
+    // This would typically come from the candidate profile
+    const candidateId = user.id; // This is a simplification
+
+    try {
+      const submission = await applyToJob({
+        job_id: job.id,
+        candidate_id: candidateId,
+        cover_letter: coverLetter.trim() || undefined,
+        expected_salary: expectedSalary ? parseFloat(expectedSalary) : undefined,
+        availability_date: availabilityDate || undefined,
+      });
+
+      if (submission) {
+        setIsApplying(false);
+        toast.success("Application submitted successfully!");
+      }
+    } catch (error) {
+      console.error("Failed to apply:", error);
+    }
+  };
+
+  const getTimeAgo = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+    
+    if (diffInHours < 24) {
+      return `${diffInHours} hours ago`;
+    } else {
+      const diffInDays = Math.floor(diffInHours / 24);
+      return `${diffInDays} days ago`;
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-green-50/50">
+      <div className="container mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="flex items-center gap-4 mb-6">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-2"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back
+          </Button>
+          <div className="flex-1" />
+          <Button variant="outline" size="sm">
+            <Share2 className="w-4 h-4 mr-2" />
+            Share
+          </Button>
+          <Button variant="outline" size="sm">
+            <Heart className="w-4 h-4 mr-2" />
+            Save
+          </Button>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Main Content */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Job Header */}
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex-1">
+                    <h1 className="text-3xl font-bold text-gray-900 mb-2">{job.title}</h1>
+                    <div className="flex items-center gap-4 text-gray-600 mb-4">
+                      <div className="flex items-center gap-1">
+                        <Building2 className="w-4 h-4" />
+                        <span className="font-medium">{job.company_name}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <MapPin className="w-4 h-4" />
+                        <span>{job.location}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Clock className="w-4 h-4" />
+                        <span>{getTimeAgo(job.created_at)}</span>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge className={jobService.getStatusColor(job.status)}>
+                        {job.status}
+                      </Badge>
+                      <Badge variant="outline">
+                        {jobService.formatJobType(job.job_type)}
+                      </Badge>
+                      {job.remote_work_allowed && (
+                        <Badge variant="secondary">Remote</Badge>
+                      )}
+                      {job.priority === "high" && (
+                        <Badge className="bg-green-100 text-green-800">Featured</Badge>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Key Details */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="w-5 h-5 text-green-600" />
+                    <div>
+                      <p className="text-sm text-gray-600">Salary</p>
+                      <p className="font-medium">{jobService.formatSalaryRange(job)}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Briefcase className="w-5 h-5 text-blue-600" />
+                    <div>
+                      <p className="text-sm text-gray-600">Experience</p>
+                      <p className="font-medium">{jobService.formatExperienceRange(job)}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Users className="w-5 h-5 text-purple-600" />
+                    <div>
+                      <p className="text-sm text-gray-600">Positions</p>
+                      <p className="font-medium">{job.positions_available} available</p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Job Description */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Job Description</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="prose max-w-none">
+                  <p className="text-gray-700 whitespace-pre-wrap">
+                    {job.external_description || job.description}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Skills & Requirements */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Skills & Requirements</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {job.required_skills.length > 0 && (
+                  <div>
+                    <h4 className="font-medium text-gray-900 mb-2">Required Skills</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {job.required_skills.map((skill, index) => (
+                        <Badge key={index} variant="outline" className="bg-red-50 border-red-200 text-red-800">
+                          {skill}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {job.preferred_skills && job.preferred_skills.length > 0 && (
+                  <div>
+                    <h4 className="font-medium text-gray-900 mb-2">Preferred Skills</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {job.preferred_skills.map((skill, index) => (
+                        <Badge key={index} variant="outline" className="bg-blue-50 border-blue-200 text-blue-800">
+                          {skill}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {job.education_requirements && (
+                  <div>
+                    <h4 className="font-medium text-gray-900 mb-2">Education Requirements</h4>
+                    <p className="text-gray-700">{job.education_requirements}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Company Info */}
+            {job.creator?.recruiterProfile && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>About the Company</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center">
+                      <Building2 className="w-6 h-6 text-gray-600" />
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-gray-900">{job.company_name}</h4>
+                      <p className="text-sm text-gray-600">
+                        Contact: {job.creator.recruiterProfile.first_name} {job.creator.recruiterProfile.last_name}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          {/* Sidebar */}
+          <div className="space-y-6">
+            {/* Apply Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Apply for this job</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {!isApplying ? (
+                  <div className="space-y-4">
+                    <Button 
+                      onClick={() => setIsApplying(true)}
+                      className="w-full bg-green-600 hover:bg-green-700"
+                      size="lg"
+                    >
+                      Apply Now
+                    </Button>
+                    <p className="text-sm text-gray-600 text-center">
+                      Quick apply with your profile
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-sm font-medium text-gray-700 mb-2 block">
+                        Cover Letter (Optional)
+                      </label>
+                      <Textarea
+                        placeholder="Tell us why you're interested in this role..."
+                        value={coverLetter}
+                        onChange={(e) => setCoverLetter(e.target.value)}
+                        rows={4}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium text-gray-700 mb-2 block">
+                        Expected Salary (Optional)
+                      </label>
+                      <Input
+                        type="number"
+                        placeholder="e.g., 80000"
+                        value={expectedSalary}
+                        onChange={(e) => setExpectedSalary(e.target.value)}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium text-gray-700 mb-2 block">
+                        Availability Date (Optional)
+                      </label>
+                      <Input
+                        type="date"
+                        value={availabilityDate}
+                        onChange={(e) => setAvailabilityDate(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="flex gap-2">
+                      <Button 
+                        onClick={handleApply}
+                        disabled={applying}
+                        className="flex-1 bg-green-600 hover:bg-green-700"
+                      >
+                        {applying ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <CheckCircle className="w-4 h-4 mr-2" />
+                        )}
+                        Submit Application
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        onClick={() => setIsApplying(false)}
+                        disabled={applying}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Job Details */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Job Details</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Job ID</span>
+                  <span className="font-medium">{job.job_id}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Posted</span>
+                  <span className="font-medium">{getTimeAgo(job.created_at)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Type</span>
+                  <span className="font-medium">{jobService.formatJobType(job.job_type)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Remote Work</span>
+                  <span className="font-medium">{job.remote_work_allowed ? "Yes" : "No"}</span>
+                </div>
+                {job.application_deadline && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Deadline</span>
+                    <span className="font-medium">
+                      {new Date(job.application_deadline).toLocaleDateString()}
+                    </span>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

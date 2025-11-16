@@ -1,7 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,6 +12,15 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   Collapsible,
   CollapsibleContent,
@@ -50,26 +62,49 @@ import {
   Zap,
   ListChecks,
   FileSpreadsheet,
+  Search,
+  Filter,
+  MessageSquare,
+  Phone,
+  Video,
+  ExternalLink,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import submissionsData from "@/data/submissions.json";
-import { CompanyFilter } from "@/components/CompanyFilter";
+import { useSubmissions } from "@/hooks/useSubmissions";
+import { useAuth } from "@/contexts/AuthContext";
+import { submissionService } from "@/services/submissionService";
+import { toast } from "sonner";
 
 const Submissions = () => {
   const navigate = useNavigate();
-  const [expandedJobs, setExpandedJobs] = useState<Set<string>>(new Set());
-  const [expandedStages, setExpandedStages] = useState<Set<string>>(new Set());
-  const [hoveredJob, setHoveredJob] = useState<string | null>(null);
-  const [hoveredStage, setHoveredStage] = useState<string | null>(null);
+  const { user } = useAuth();
+  const { 
+    submissions, 
+    loading, 
+    error, 
+    pagination, 
+    filters, 
+    fetchSubmissions, 
+    refresh,
+    setFilters 
+  } = useSubmissions();
 
-  // Group submissions by job
-  const submissionsByJob = submissionsData.submissions.reduce((acc, submission) => {
-    const jobKey = `${submission.jobId}-${submission.company}`;
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [jobFilter, setJobFilter] = useState("all");
+  const [expandedSubmissions, setExpandedSubmissions] = useState<Set<string>>(new Set());
+  const [selectedSubmission, setSelectedSubmission] = useState<any>(null);
+  const [showStatusDialog, setShowStatusDialog] = useState(false);
+  const [showNoteDialog, setShowNoteDialog] = useState(false);
+  const [newStatus, setNewStatus] = useState("");
+  const [newNote, setNewNote] = useState("");
+
+  // Group submissions by job for better organization
+  const submissionsByJob = submissions.reduce((acc, submission) => {
+    const jobKey = submission.job?.id || 'unknown';
     if (!acc[jobKey]) {
       acc[jobKey] = {
-        jobId: submission.jobId,
-        jobTitle: submission.jobTitle,
-        company: submission.company,
+        job: submission.job,
         submissions: [],
       };
     }
@@ -77,405 +112,607 @@ const Submissions = () => {
     return acc;
   }, {} as Record<string, any>);
 
-  // Define submission stages
-  const stages = [
-    { id: "just-submitted", name: "Just Submitted", color: "bg-blue-100 text-blue-800" },
-    { id: "client-submission", name: "Client Submission", color: "bg-purple-100 text-purple-800" },
-    { id: "interviewing", name: "Interviewing", color: "bg-yellow-100 text-yellow-800" },
-    { id: "placement", name: "Placement", color: "bg-green-100 text-green-800" },
-  ];
+  // Calculate stats
+  const stats = {
+    total: submissions.length,
+    submitted: submissions.filter(s => s.status === "submitted").length,
+    underReview: submissions.filter(s => s.status === "under_review").length,
+    shortlisted: submissions.filter(s => s.status === "shortlisted").length,
+    interviewed: submissions.filter(s => s.status === "interviewed").length,
+    offered: submissions.filter(s => s.status === "offered").length,
+    hired: submissions.filter(s => s.status === "hired").length,
+    rejected: submissions.filter(s => s.status === "rejected").length,
+  };
 
-  // Map submission status to stages
-  const getStageForStatus = (status: string) => {
-    switch (status) {
-      case "Under Review": return "just-submitted";
-      case "Pending Client Review": return "client-submission";
-      case "Interview Scheduled": return "interviewing";
-      default: return "just-submitted";
+  const handleSearch = () => {
+    const newFilters = {
+      ...filters,
+      search: searchTerm || undefined,
+      status: statusFilter === "all" ? undefined : statusFilter,
+      job_id: jobFilter === "all" ? undefined : jobFilter,
+      page: 1,
+    };
+    fetchSubmissions(newFilters);
+  };
+
+  const handleStatusUpdate = async () => {
+    if (!selectedSubmission || !newStatus) return;
+
+    const success = await updateSubmissionStatus(selectedSubmission.id, newStatus);
+    if (success) {
+      setShowStatusDialog(false);
+      setSelectedSubmission(null);
+      setNewStatus("");
+      refresh();
     }
   };
 
-  const toggleJobExpansion = (jobKey: string) => {
-    const newExpanded = new Set(expandedJobs);
-    if (newExpanded.has(jobKey)) {
-      newExpanded.delete(jobKey);
+  const handleAddNote = async () => {
+    if (!selectedSubmission || !newNote.trim()) return;
+
+    const success = await addSubmissionNote(selectedSubmission.id, newNote);
+    if (success) {
+      setShowNoteDialog(false);
+      setSelectedSubmission(null);
+      setNewNote("");
+      refresh();
+    }
+  };
+
+  const toggleSubmissionExpansion = (submissionId: string) => {
+    const newExpanded = new Set(expandedSubmissions);
+    if (newExpanded.has(submissionId)) {
+      newExpanded.delete(submissionId);
     } else {
-      newExpanded.add(jobKey);
+      newExpanded.add(submissionId);
     }
-    setExpandedJobs(newExpanded);
+    setExpandedSubmissions(newExpanded);
   };
 
-  const toggleStageExpansion = (stageKey: string) => {
-    const newExpanded = new Set(expandedStages);
-    if (newExpanded.has(stageKey)) {
-      newExpanded.delete(stageKey);
-    } else {
-      newExpanded.add(stageKey);
+  const getStatusColor = (status: string) => {
+    const colors = {
+      submitted: "bg-blue-100 text-blue-800",
+      under_review: "bg-yellow-100 text-yellow-800",
+      shortlisted: "bg-green-100 text-green-800",
+      interview_scheduled: "bg-purple-100 text-purple-800",
+      interviewed: "bg-indigo-100 text-indigo-800",
+      offered: "bg-emerald-100 text-emerald-800",
+      hired: "bg-green-100 text-green-800",
+      rejected: "bg-red-100 text-red-800",
+      withdrawn: "bg-gray-100 text-gray-800",
+    };
+    return colors[status as keyof typeof colors] || "bg-gray-100 text-gray-800";
+  };
+
+  const getStatusLabel = (status: string) => {
+    const labels = {
+      submitted: "Submitted",
+      under_review: "Under Review",
+      shortlisted: "Shortlisted",
+      interview_scheduled: "Interview Scheduled",
+      interviewed: "Interviewed",
+      offered: "Offered",
+      hired: "Hired",
+      rejected: "Rejected",
+      withdrawn: "Withdrawn",
+    };
+    return labels[status as keyof typeof labels] || status;
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const formatSalary = (amount?: number) => {
+    if (!amount) return "Not specified";
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  };
+
+  // Load initial data
+  useEffect(() => {
+    if (user && ["recruiter", "candidate", "vendor"].includes(user.role)) {
+      fetchSubmissions({ page: 1, limit: 50 });
     }
-    setExpandedStages(newExpanded);
-  };
+  }, [user?.role]);
 
-  const getScoreColor = (score: number) => {
-    if (score >= 90) return "text-green-600";
-    if (score >= 80) return "text-blue-600";
-    if (score >= 70) return "text-yellow-600";
-    return "text-red-600";
-  };
-
-  const totalSubmissions = submissionsData.submissions.length;
-  const totalJobs = Object.keys(submissionsByJob).length;
-  const activeSubmissions = submissionsData.submissions.filter(s => s.status !== "Rejected").length;
-  const interviewScheduled = submissionsData.submissions.filter(s => s.status === "Interview Scheduled").length;
-
-  const navigationCards = [
-    {
-      title: "Total Submissions",
-      value: totalSubmissions.toString(),
-      icon: FileText,
-      color: "text-blue-700",
-      gradientOverlay: "bg-gradient-to-br from-blue-400/30 via-blue-500/20 to-blue-600/30",
-    },
-    {
-      title: "Active Jobs",
-      value: totalJobs.toString(),
-      icon: Briefcase,
-      color: "text-green-700",
-      gradientOverlay: "bg-gradient-to-br from-green-400/30 via-green-500/20 to-green-600/30",
-    },
-    {
-      title: "In Progress",
-      value: activeSubmissions.toString(),
-      icon: Clock,
-      color: "text-amber-700",
-      gradientOverlay: "bg-gradient-to-br from-amber-400/30 via-amber-500/20 to-amber-600/30",
-    },
-    {
-      title: "Interviews",
-      value: interviewScheduled.toString(),
-      icon: Users,
-      color: "text-purple-700",
-      gradientOverlay: "bg-gradient-to-br from-purple-400/30 via-purple-500/20 to-purple-600/30",
-    },
-  ];
+  if (!user || !["recruiter", "candidate", "vendor"].includes(user.role)) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <AlertCircle className="h-8 w-8 text-red-500 mx-auto mb-2" />
+          <p className="text-gray-600">Access denied. Only recruiters, candidates, and vendors can view submissions.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-2 sm:space-y-3 md:space-y-4 px-1 sm:px-0">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-3">
-        <div className="flex items-center gap-4">
-          <div>
-            <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 font-roboto-slab">Submissions</h1>
-          </div>
-          <CompanyFilter 
-            onCompanyChange={(companyId) => console.log("Selected company:", companyId)}
-          />
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">
+            {user.role === "recruiter" ? "Job Applications" : 
+             user.role === "candidate" ? "My Applications" : 
+             "My Submissions"}
+          </h1>
+          <p className="text-gray-600">
+            {user.role === "recruiter" ? "Manage applications for your job postings" : 
+             user.role === "candidate" ? "Track your job applications" : 
+             "Track your candidate submissions"}
+          </p>
         </div>
-        <div className="flex items-center gap-1 sm:gap-2 w-full sm:w-auto">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="border-green-200 hover:bg-green-50 hover:border-green-300 text-xs flex-1 sm:flex-none px-2 sm:px-3 transition-all duration-300">
-                <Calendar className="w-3 h-3 mr-1" />
-                <span className="hidden sm:inline">Export</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-white border-gray-200 z-50">
-              <DropdownMenuItem>
-                <FileText className="w-4 h-4 mr-2" />
-                Export as PDF
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <FileSpreadsheet className="w-4 h-4 mr-2" />
-                Export as Excel
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <FileSpreadsheet className="w-4 h-4 mr-2" />
-                Export to Google Sheets
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="border-orange-200 hover:bg-orange-50 hover:border-orange-300 text-xs flex-1 sm:flex-none px-2 sm:px-3 transition-all duration-300">
-                <Settings className="w-3 h-3 mr-1" />
-                <span className="hidden sm:inline">Actions</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-white border-gray-200 z-50">
-              <DropdownMenuItem>
-                <PlusCircle className="w-4 h-4 mr-2" />
-                Create a task
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Send className="w-4 h-4 mr-2" />
-                Send Followup
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Change status
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Trash className="w-4 h-4 mr-2" />
-                Mark for deletion
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>
-                <Bot className="w-4 h-4 mr-2" />
-                AI Recruiter
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <ListChecks className="w-4 h-4 mr-2" />
-                Mass changes
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          <Button className="button-gradient text-white shadow-lg hover:shadow-xl transition-all duration-300 text-xs flex-1 sm:flex-none px-2 sm:px-3 hover:scale-105">
-            <Plus className="w-3 h-3 mr-1" />
-            <span className="hidden sm:inline">New Submission</span>
-            <span className="sm:hidden">New</span>
+        <div className="flex items-center space-x-2">
+          <Button variant="outline">
+            <FileSpreadsheet className="h-4 w-4 mr-2" />
+            Export
           </Button>
+          {user.role === "recruiter" && (
+            <Button variant="outline">
+              <Bot className="h-4 w-4 mr-2" />
+              AI Insights
+            </Button>
+          )}
         </div>
       </div>
 
-      {/* Navigation Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 sm:gap-2">
-        {navigationCards.map((card, index) => {
-          const IconComponent = card.icon;
-          return (
-            <Card 
-              key={card.title} 
-              className="relative overflow-hidden border-0 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 group cursor-pointer backdrop-blur-xl bg-white/20 hover:scale-105"
-              style={{ animationDelay: `${index * 100}ms` }}
-            >
-              <div className={`absolute inset-0 ${card.gradientOverlay} opacity-60 group-hover:opacity-80 transition-opacity duration-300`}></div>
-              <div className="absolute inset-0 bg-gradient-to-br from-white/40 via-white/20 to-transparent"></div>
-              
-              {/* Animated pulse effect */}
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
-              
-              <CardContent className="relative p-1.5 sm:p-2">
-                <div className="flex flex-col items-center space-y-1">
-                  <div className="p-1 sm:p-1.5 rounded-full bg-white/30 backdrop-blur-sm shadow-sm group-hover:bg-white/40 transition-all border border-white/20 group-hover:rotate-6 group-hover:scale-110">
-                    <IconComponent className={`h-2.5 w-2.5 sm:h-3 sm:w-3 ${card.color} transition-transform duration-300`} />
-                  </div>
-                  <div className="text-center">
-                    <p className="text-xs font-semibold text-gray-600 font-roboto-slab truncate">{card.title}</p>
-                    <p className="text-xs sm:text-sm font-bold text-gray-900 font-roboto-slab group-hover:scale-110 transition-transform duration-300">{card.value}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-center">
+              <p className="text-2xl font-bold text-blue-700">{stats.total}</p>
+              <p className="text-sm text-gray-600">Total</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-center">
+              <p className="text-2xl font-bold text-blue-700">{stats.submitted}</p>
+              <p className="text-sm text-gray-600">Submitted</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-center">
+              <p className="text-2xl font-bold text-yellow-700">{stats.underReview}</p>
+              <p className="text-sm text-gray-600">Under Review</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-center">
+              <p className="text-2xl font-bold text-green-700">{stats.shortlisted}</p>
+              <p className="text-sm text-gray-600">Shortlisted</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-center">
+              <p className="text-2xl font-bold text-purple-700">{stats.interviewed}</p>
+              <p className="text-sm text-gray-600">Interviewed</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-center">
+              <p className="text-2xl font-bold text-emerald-700">{stats.offered}</p>
+              <p className="text-sm text-gray-600">Offered</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-center">
+              <p className="text-2xl font-bold text-green-700">{stats.hired}</p>
+              <p className="text-sm text-gray-600">Hired</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-center">
+              <p className="text-2xl font-bold text-red-700">{stats.rejected}</p>
+              <p className="text-sm text-gray-600">Rejected</p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Submissions List with Interactive Connections */}
-      <Card className="border-gray-200 shadow-sm overflow-hidden bg-white/95 backdrop-blur-sm">
-        <CardContent className="p-0 relative">
-          {/* Background grid pattern */}
-          <div className="absolute inset-0 opacity-5">
-            <div className="absolute inset-0" style={{
-              backgroundImage: `radial-gradient(circle at 1px 1px, rgba(0,0,0,0.3) 1px, transparent 0)`,
-              backgroundSize: '20px 20px'
-            }}></div>
-          </div>
-          
-          <div className="space-y-0 relative">
-            {Object.entries(submissionsByJob).map(([jobKey, jobData], jobIndex) => (
-              <div key={jobKey} className="relative">
-                {/* Animated connection line for expanded jobs */}
-                {expandedJobs.has(jobKey) && (
-                  <div className="absolute left-8 top-16 bottom-0 w-0.5 bg-gradient-to-b from-blue-400 via-purple-400 to-green-400 opacity-60">
-                    <div className="absolute inset-0 bg-gradient-to-b from-blue-400 via-purple-400 to-green-400 animate-pulse"></div>
-                    <div className="absolute top-0 w-2 h-2 -left-0.75 bg-blue-400 rounded-full animate-ping"></div>
-                  </div>
-                )}
-                
-                <Collapsible 
-                  open={expandedJobs.has(jobKey)}
-                  onOpenChange={() => toggleJobExpansion(jobKey)}
-                >
-                  <CollapsibleTrigger className="w-full">
-                    <div 
-                      className="flex items-center justify-between p-4 border-b hover:bg-gradient-to-r hover:from-blue-50/50 hover:to-purple-50/50 transition-all duration-300 group relative overflow-hidden"
-                      onMouseEnter={() => setHoveredJob(jobKey)}
-                      onMouseLeave={() => setHoveredJob(null)}
-                    >
-                      {/* Hover effect background */}
-                      <div className="absolute inset-0 bg-gradient-to-r from-blue-100/0 via-purple-100/20 to-blue-100/0 transform -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
-                      
-                      <div className="flex items-center gap-3 relative z-10 flex-1">
-                        <div className="relative">
-                          {expandedJobs.has(jobKey) ? (
-                            <ChevronDown className="w-4 h-4 text-gray-500 transition-transform duration-300 group-hover:rotate-180" />
-                          ) : (
-                            <ChevronRight className="w-4 h-4 text-gray-500 transition-transform duration-300 group-hover:rotate-90" />
-                          )}
-                          {hoveredJob === jobKey && (
-                            <div className="absolute -inset-2 bg-blue-200 rounded-full animate-ping opacity-50"></div>
-                          )}
-                        </div>
-                        <div className="relative">
-                          <Briefcase className="w-5 h-5 text-blue-600 group-hover:scale-110 transition-transform duration-300" />
-                          {expandedJobs.has(jobKey) && (
-                            <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
-                          )}
-                        </div>
-                        <div className="text-left flex-1">
-                          <p className="font-medium text-gray-900 font-poppins text-sm group-hover:text-blue-700 transition-colors duration-300">{jobData.jobTitle}</p>
-                          <p className="text-xs text-gray-600 font-poppins">{jobData.company}</p>
-                        </div>
-                      </div>
-                      
-                      {/* Status Summary - Now at same level as job */}
-                      <div className="flex items-center gap-2 relative z-10">
-                        {stages.map((stage) => {
-                          const stageSubmissions = jobData.submissions.filter(
-                            (sub: any) => getStageForStatus(sub.status) === stage.id
-                          );
-                          if (stageSubmissions.length === 0) return null;
-                          
-                          return (
-                            <div key={stage.id} className="flex items-center gap-1">
-                              <div className={`w-2 h-2 rounded-full ${stage.color.includes('blue') ? 'bg-blue-400' : stage.color.includes('purple') ? 'bg-purple-400' : stage.color.includes('yellow') ? 'bg-yellow-400' : 'bg-green-400'} transition-all duration-300 group-hover:scale-125`}></div>
-                              <Badge className={`${stage.color} border font-medium font-poppins text-xs transition-all duration-300 group-hover:scale-105`}>
-                                {stage.name}: {stageSubmissions.length}
-                              </Badge>
-                            </div>
-                          );
-                        })}
-                        
-                        <Badge className="bg-blue-100 text-blue-800 border font-medium font-poppins text-xs group-hover:bg-blue-200 transition-colors duration-300 ml-2">
-                          Total: {jobData.submissions.length}
-                        </Badge>
-                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-gray-100 group-hover:rotate-180 transition-transform duration-300">
-                          <MoreHorizontal className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CollapsibleTrigger>
-                  
-                  <CollapsibleContent>
-                    <div className="bg-gradient-to-br from-gray-50/50 to-blue-50/30 border-b relative">
-                      {stages.map((stage, stageIndex) => {
-                        const stageSubmissions = jobData.submissions.filter(
-                          (sub: any) => getStageForStatus(sub.status) === stage.id
-                        );
-                        const stageKey = `${jobKey}-${stage.id}`;
-                        
-                        if (stageSubmissions.length === 0) return null;
-
-                        return (
-                          <div key={stage.id} className="relative">
-                            {/* Stage connection lines */}
-                            <div className="absolute left-16 top-0 w-8 h-6 border-l-2 border-b-2 border-dashed border-gray-300 opacity-50"></div>
-                            {expandedStages.has(stageKey) && (
-                              <div className="absolute left-20 top-12 bottom-0 w-0.5 bg-gradient-to-b from-yellow-400 to-green-400 opacity-40">
-                                <div className="absolute top-0 w-1.5 h-1.5 -left-0.5 bg-yellow-400 rounded-full animate-bounce"></div>
-                              </div>
-                            )}
-                            
-                            <Collapsible 
-                              open={expandedStages.has(stageKey)}
-                              onOpenChange={() => toggleStageExpansion(stageKey)}
-                            >
-                              <CollapsibleTrigger className="w-full">
-                                <div 
-                                  className="flex items-center justify-between p-3 pl-12 border-b border-gray-200 hover:bg-white/70 transition-all duration-300 group relative"
-                                  onMouseEnter={() => setHoveredStage(stageKey)}
-                                  onMouseLeave={() => setHoveredStage(null)}
-                                >
-                                  <div className="flex items-center gap-3">
-                                    {expandedStages.has(stageKey) ? (
-                                      <ChevronDown className="w-3 h-3 text-gray-400 transition-transform duration-300" />
-                                    ) : (
-                                      <ChevronRight className="w-3 h-3 text-gray-400 transition-transform duration-300" />
-                                    )}
-                                    <div className={`w-3 h-3 rounded-full ${stage.color.includes('blue') ? 'bg-blue-400' : stage.color.includes('purple') ? 'bg-purple-400' : stage.color.includes('yellow') ? 'bg-yellow-400' : 'bg-green-400'} transition-all duration-300 group-hover:scale-125 ${hoveredStage === stageKey ? 'animate-pulse' : ''}`}></div>
-                                    <span className="font-medium text-gray-700 font-poppins text-sm group-hover:text-gray-900 transition-colors duration-300">{stage.name}</span>
-                                  </div>
-                                  <Badge className={`${stage.color} border font-medium font-poppins text-xs transition-all duration-300 group-hover:scale-105`}>
-                                    {stageSubmissions.length}
-                                  </Badge>
-                                </div>
-                              </CollapsibleTrigger>
-                              
-                              <CollapsibleContent>
-                                <div className="bg-white/80 backdrop-blur-sm">
-                                  {stageSubmissions.map((submission: any, subIndex) => (
-                                    <div 
-                                      key={submission.id}
-                                      className="flex items-center justify-between p-3 pl-20 border-b border-gray-100 hover:bg-gradient-to-r hover:from-blue-50/30 hover:to-purple-50/30 transition-all duration-300 cursor-pointer group relative"
-                                      onClick={() => navigate(`/dashboard/submissions/${submission.id}`)}
-                                      style={{ animationDelay: `${subIndex * 50}ms` }}
-                                    >
-                                      {/* Connection dot */}
-                                      <div className="absolute left-16 top-1/2 w-2 h-2 bg-gray-300 rounded-full transform -translate-y-1/2 group-hover:bg-blue-400 transition-colors duration-300"></div>
-                                      <div className="absolute left-16 top-1/2 w-6 h-0.5 bg-gray-200 transform -translate-y-1/2"></div>
-                                      
-                                      <div className="flex items-center gap-4 flex-1">
-                                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center group-hover:scale-110 transition-transform duration-300 relative overflow-hidden">
-                                          <span className="text-xs font-medium text-blue-700 font-poppins relative z-10">
-                                            {submission.candidateName.split(' ').map((n: string) => n[0]).join('')}
-                                          </span>
-                                          <div className="absolute inset-0 bg-gradient-to-r from-blue-200/0 via-purple-200/50 to-blue-200/0 transform -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
-                                        </div>
-                                        <div className="flex-1">
-                                          <p className="font-medium text-gray-900 font-poppins text-sm group-hover:text-blue-700 transition-colors duration-300">{submission.candidateName}</p>
-                                          <p className="text-xs text-gray-600 font-poppins">{submission.location}</p>
-                                        </div>
-                                        <div className="text-right">
-                                          <p className="text-xs text-gray-600 font-poppins">{submission.experience}</p>
-                                          <p className="text-xs text-gray-500 font-poppins">{submission.expectedSalary}</p>
-                                        </div>
-                                        <div className={`flex items-center gap-1 ${getScoreColor(submission.aiScore)} group-hover:scale-110 transition-transform duration-300`}>
-                                          <Star className="w-3 h-3 fill-current group-hover:animate-spin" />
-                                          <span className="text-xs font-medium font-poppins">{submission.aiScore}</span>
-                                        </div>
-                                      </div>
-                                      <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-gray-100 opacity-0 group-hover:opacity-100 transition-all duration-300 hover:rotate-90">
-                                            <MoreHorizontal className="w-3 h-3" />
-                                          </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end" className="bg-white border-gray-200">
-                                          <DropdownMenuItem>
-                                            <Eye className="w-4 h-4 mr-2" />
-                                            View Details
-                                          </DropdownMenuItem>
-                                          <DropdownMenuItem>
-                                            <Mail className="w-4 h-4 mr-2" />
-                                            Send Email
-                                          </DropdownMenuItem>
-                                          <DropdownMenuItem>
-                                            <Users2 className="w-4 h-4 mr-2" />
-                                            Schedule Interview
-                                          </DropdownMenuItem>
-                                          <DropdownMenuSeparator />
-                                          <DropdownMenuItem className="text-red-600">
-                                            <Trash2 className="w-4 h-4 mr-2" />
-                                            Reject
-                                          </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                      </DropdownMenu>
-                                    </div>
-                                  ))}
-                                </div>
-                              </CollapsibleContent>
-                            </Collapsible>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </CollapsibleContent>
-                </Collapsible>
+      {/* Search and Filters */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Input
+                  placeholder="Search by candidate name, job title, or company..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                  onKeyPress={(e) => e.key === "Enter" && handleSearch()}
+                />
               </div>
-            ))}
+            </div>
+            <div className="flex gap-2">
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="submitted">Submitted</SelectItem>
+                  <SelectItem value="under_review">Under Review</SelectItem>
+                  <SelectItem value="shortlisted">Shortlisted</SelectItem>
+                  <SelectItem value="interview_scheduled">Interview Scheduled</SelectItem>
+                  <SelectItem value="interviewed">Interviewed</SelectItem>
+                  <SelectItem value="offered">Offered</SelectItem>
+                  <SelectItem value="hired">Hired</SelectItem>
+                  <SelectItem value="rejected">Rejected</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Button onClick={handleSearch} variant="default">
+                <Search className="h-4 w-4 mr-2" />
+                Search
+              </Button>
+
+              <Button onClick={refresh} variant="outline" disabled={loading}>
+                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* Submissions List */}
+      <Card>
+        <CardHeader>
+          <CardTitle>
+            {user.role === "recruiter" ? "Applications by Job" : "Applications"} ({pagination.totalItems})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="space-y-4">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="animate-pulse">
+                  <div className="h-24 bg-gray-200 rounded-lg"></div>
+                </div>
+              ))}
+            </div>
+          ) : error ? (
+            <div className="text-center py-8">
+              <AlertCircle className="h-8 w-8 text-red-500 mx-auto mb-2" />
+              <p className="text-gray-600">{error}</p>
+              <Button onClick={refresh} variant="outline" className="mt-2">
+                Try Again
+              </Button>
+            </div>
+          ) : submissions.length === 0 ? (
+            <div className="text-center py-8">
+              <FileText className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+              <p className="text-gray-600">No submissions found</p>
+              <p className="text-sm text-gray-500 mt-1">
+                {user.role === "candidate" ? "Start applying to jobs to see your applications here" : 
+                 user.role === "recruiter" ? "View submissions by going to Jobs → [Select Job] → View Submissions" :
+                 "Applications will appear here once candidates apply to your jobs"}
+              </p>
+              {user.role === "recruiter" && (
+                <Button 
+                  onClick={() => navigate('/dashboard/jobs')} 
+                  className="mt-4"
+                  variant="outline"
+                >
+                  <Briefcase className="h-4 w-4 mr-2" />
+                  Go to Jobs
+                </Button>
+              )}
+            </div>
+          ) : user.role === "recruiter" ? (
+            // Group by job for recruiters
+            <div className="space-y-6">
+              {Object.entries(submissionsByJob).map(([jobKey, jobData]) => (
+                <div key={jobKey} className="border rounded-lg">
+                  <Collapsible>
+                    <CollapsibleTrigger className="w-full p-4 hover:bg-gray-50 transition-colors">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <ChevronRight className="h-4 w-4" />
+                          <div className="text-left">
+                            <h3 className="font-semibold text-gray-900">{jobData.job?.title}</h3>
+                            <p className="text-sm text-gray-600">{jobData.job?.company_name}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-4">
+                          <Badge variant="secondary">
+                            {jobData.submissions.length} applications
+                          </Badge>
+                          <Badge className={getStatusColor(jobData.job?.status)}>
+                            {jobData.job?.status}
+                          </Badge>
+                        </div>
+                      </div>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="border-t bg-gray-50 p-4 space-y-4">
+                        {jobData.submissions.map((submission: any) => (
+                          <div key={submission.id} className="bg-white border rounded-lg p-4">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center space-x-3 mb-2">
+                                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                                    <User className="h-5 w-5 text-blue-600" />
+                                  </div>
+                                  <div>
+                                    <h4 className="font-semibold text-gray-900">
+                                      {submission.candidate?.first_name} {submission.candidate?.last_name}
+                                    </h4>
+                                    <p className="text-sm text-gray-600">{submission.candidate?.email}</p>
+                                  </div>
+                                  <Badge className={getStatusColor(submission.status)}>
+                                    {getStatusLabel(submission.status)}
+                                  </Badge>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600 mb-3">
+                                  <div className="flex items-center space-x-2">
+                                    <Calendar className="h-4 w-4" />
+                                    <span>Applied: {formatDate(submission.submitted_at)}</span>
+                                  </div>
+                                  <div className="flex items-center space-x-2">
+                                    <DollarSign className="h-4 w-4" />
+                                    <span>Expected: {formatSalary(submission.expected_salary)}</span>
+                                  </div>
+                                  <div className="flex items-center space-x-2">
+                                    <Clock className="h-4 w-4" />
+                                    <span>Available: {submission.availability_date ? new Date(submission.availability_date).toLocaleDateString() : 'Immediately'}</span>
+                                  </div>
+                                </div>
+
+                                {submission.cover_letter && (
+                                  <div className="mb-3">
+                                    <p className="text-sm font-medium text-gray-700 mb-1">Cover Letter:</p>
+                                    <p className="text-sm text-gray-600 line-clamp-2">{submission.cover_letter}</p>
+                                  </div>
+                                )}
+                              </div>
+
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="sm">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => navigate(`/dashboard/candidates/${submission.candidate?.id}`)}>
+                                    <Eye className="h-4 w-4 mr-2" />
+                                    View Candidate Profile
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => {
+                                    setSelectedSubmission(submission);
+                                    setShowStatusDialog(true);
+                                  }}>
+                                    <Edit className="h-4 w-4 mr-2" />
+                                    Update Status
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => {
+                                    setSelectedSubmission(submission);
+                                    setShowNoteDialog(true);
+                                  }}>
+                                    <MessageSquare className="h-4 w-4 mr-2" />
+                                    Add Note
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem>
+                                    <Mail className="h-4 w-4 mr-2" />
+                                    Send Email
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem>
+                                    <Calendar className="h-4 w-4 mr-2" />
+                                    Schedule Interview
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem>
+                                    <FileText className="h-4 w-4 mr-2" />
+                                    Download Resume
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                </div>
+              ))}
+            </div>
+          ) : (
+            // Simple list for candidates and vendors
+            <div className="space-y-4">
+              {submissions.map((submission) => (
+                <div key={submission.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-3 mb-2">
+                        <h3 className="text-lg font-semibold text-gray-900">{submission.job?.title}</h3>
+                        <Badge className={getStatusColor(submission.status)}>
+                          {getStatusLabel(submission.status)}
+                        </Badge>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm text-gray-600 mb-3">
+                        <div className="flex items-center space-x-2">
+                          <Building className="h-4 w-4" />
+                          <span>{submission.job?.company_name}</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <MapPin className="h-4 w-4" />
+                          <span>{submission.job?.location}</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Calendar className="h-4 w-4" />
+                          <span>Applied: {formatDate(submission.submitted_at)}</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <DollarSign className="h-4 w-4" />
+                          <span>Expected: {formatSalary(submission.expected_salary)}</span>
+                        </div>
+                      </div>
+
+                      {submission.cover_letter && (
+                        <div className="mb-3">
+                          <p className="text-sm font-medium text-gray-700 mb-1">Cover Letter:</p>
+                          <p className="text-sm text-gray-600 line-clamp-2">{submission.cover_letter}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => navigate(`/job-detail/${submission.job?.id}`)}>
+                          <Eye className="h-4 w-4 mr-2" />
+                          View Job Details
+                        </DropdownMenuItem>
+                        {user.role === "candidate" && submission.status === "submitted" && (
+                          <DropdownMenuItem className="text-red-600">
+                            <Trash className="h-4 w-4 mr-2" />
+                            Withdraw Application
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem>
+                          <ExternalLink className="h-4 w-4 mr-2" />
+                          View Timeline
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+              ))}
+
+              {/* Pagination */}
+              {pagination.totalPages > 1 && (
+                <div className="flex items-center justify-between mt-6">
+                  <div className="text-sm text-gray-600">
+                    Showing {((pagination.currentPage - 1) * pagination.itemsPerPage) + 1} to{" "}
+                    {Math.min(pagination.currentPage * pagination.itemsPerPage, pagination.totalItems)} of{" "}
+                    {pagination.totalItems} submissions
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fetchSubmissions({ ...filters, page: pagination.currentPage - 1 })}
+                      disabled={!pagination.hasPrevPage}
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-sm text-gray-600">
+                      Page {pagination.currentPage} of {pagination.totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fetchSubmissions({ ...filters, page: pagination.currentPage + 1 })}
+                      disabled={!pagination.hasNextPage}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Status Update Dialog */}
+      <Dialog open={showStatusDialog} onOpenChange={setShowStatusDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Update Application Status</DialogTitle>
+            <DialogDescription>
+              Change the status of {selectedSubmission?.candidate?.first_name} {selectedSubmission?.candidate?.last_name}'s application
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Select value={newStatus} onValueChange={setNewStatus}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select new status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="under_review">Under Review</SelectItem>
+                <SelectItem value="shortlisted">Shortlisted</SelectItem>
+                <SelectItem value="interview_scheduled">Interview Scheduled</SelectItem>
+                <SelectItem value="interviewed">Interviewed</SelectItem>
+                <SelectItem value="offered">Offered</SelectItem>
+                <SelectItem value="hired">Hired</SelectItem>
+                <SelectItem value="rejected">Rejected</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowStatusDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleStatusUpdate} disabled={!newStatus}>
+              Update Status
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Note Dialog */}
+      <Dialog open={showNoteDialog} onOpenChange={setShowNoteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Note</DialogTitle>
+            <DialogDescription>
+              Add a note to {selectedSubmission?.candidate?.first_name} {selectedSubmission?.candidate?.last_name}'s application
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Textarea
+              placeholder="Enter your note here..."
+              value={newNote}
+              onChange={(e) => setNewNote(e.target.value)}
+              rows={4}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowNoteDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleAddNote} disabled={!newNote.trim()}>
+              Add Note
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

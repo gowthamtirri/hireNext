@@ -6,6 +6,9 @@ export interface AuthenticatedRequest extends Request {
   user?: JWTPayload;
 }
 
+// Export alias for AuthRequest
+export type AuthRequest = AuthenticatedRequest;
+
 export const authenticate = (
   req: AuthenticatedRequest,
   res: Response,
@@ -61,3 +64,9 @@ export const vendorOnly = authorize("vendor");
 
 // Middleware to check if user is recruiter or admin
 export const recruiterOrAdmin = authorize("recruiter", "admin");
+
+// Export alias for auth
+export const auth = authenticate;
+
+// Export alias for protect
+export const protect = authenticate;

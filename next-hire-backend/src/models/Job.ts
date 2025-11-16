@@ -278,22 +278,6 @@ Job.init(
     sequelize,
     modelName: "Job",
     tableName: "jobs",
-    hooks: {
-      beforeCreate: async (job: Job) => {
-        if (!job.job_id) {
-          // Generate job ID like JOB-2024-001
-          const year = new Date().getFullYear();
-          const count = await Job.count({
-            where: {
-              job_id: {
-                [Op.like]: `JOB-${year}-%`,
-              },
-            },
-          });
-          job.job_id = `JOB-${year}-${String(count + 1).padStart(3, "0")}`;
-        }
-      },
-    },
     indexes: [
       {
         unique: true,

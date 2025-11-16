@@ -1,8 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DataGrid } from "@/components/ui/data-grid";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,9 +33,15 @@ import {
   TrendingUp,
   Target,
   Award,
+  Search,
+  RefreshCw,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { CompanyFilter } from "@/components/CompanyFilter";
+import { usePlacements, usePlacementStats } from "@/hooks/usePlacements";
+import { placementService, PlacementStatus, PlacementType } from "@/services/placementService";
+import { useAuth } from "@/contexts/AuthContext";
 
 // Mock placements data
 const placementsData = [
@@ -121,21 +129,61 @@ const placementsData = [
 
 const Placements = () => {
   const navigate = useNavigate();
-  const [activeFilters, setActiveFilters] = useState<Record<string, string[]>>({});
+  const { user } = useAuth();
+  
+  // Hooks
+  const { 
+    placements, 
+    loading, 
+    error, 
+    pagination, 
+    fetchPlacements, 
+    refresh 
+  } = usePlacements();
+  
+  const { 
+    stats, 
+    loading: statsLoading, 
+    refresh: refreshStats 
+  } = usePlacementStats();
 
-  const activePlacements = placementsData.filter(placement => placement.status === "Active").length;
-  const completedPlacements = placementsData.filter(placement => placement.status === "Completed").length;
-  const totalCommission = placementsData.reduce((sum, placement) => sum + parseFloat(placement.commission.replace(/[$,]/g, '')), 0);
-  const avgSalary = placementsData.reduce((sum, placement) => sum + parseFloat(placement.salary.replace(/[$,]/g, '')), 0) / placementsData.length;
-  const totalPlacements = placementsData.length;
-  const avgMargin = (placementsData.reduce((sum, placement) => sum + parseFloat(placement.margin.replace('%', '')), 0) / placementsData.length).toFixed(1);
+  // Filters
+  const [statusFilter, setStatusFilter] = useState<PlacementStatus | "">("");
+  const [typeFilter, setTypeFilter] = useState<PlacementType | "">("");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Apply filters
+  const handleApplyFilters = () => {
+    const filters: any = {};
+    if (statusFilter) filters.status = statusFilter;
+    if (typeFilter) filters.placement_type = typeFilter;
+    if (searchQuery) filters.search = searchQuery;
+    
+    fetchPlacements(filters);
+  };
+
+  // Clear filters
+  const handleClearFilters = () => {
+    setStatusFilter("");
+    setTypeFilter("");
+    setSearchQuery("");
+    fetchPlacements({});
+  };
+
+  // Calculate stats from real data
+  const activePlacements = stats?.activePlacements || 0;
+  const completedPlacements = stats?.completedPlacements || 0;
+  const totalPlacements = stats?.totalPlacements || 0;
+  const terminatedPlacements = stats?.terminatedPlacements || 0;
 
   const handleActiveClick = () => {
-    setActiveFilters({ status: ["Active"] });
+    setStatusFilter("active");
+    handleApplyFilters();
   };
 
   const handleCompletedClick = () => {
-    setActiveFilters({ status: ["Completed"] });
+    setStatusFilter("completed");
+    handleApplyFilters();
   };
 
   const navigationCards = [

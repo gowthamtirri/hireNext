@@ -1,6 +1,15 @@
 import { Response } from "express";
 import { Op } from "sequelize";
-import { User, Candidate, Job, Submission, Interview } from "../models";
+import {
+  User,
+  Candidate,
+  Job,
+  Submission,
+  Interview,
+  Experience,
+  Education,
+  CandidateSkill,
+} from "../models";
 import { createError, asyncHandler } from "../middleware/errorHandler";
 import { AuthenticatedRequest } from "../middleware/auth";
 import { logger } from "../utils/logger";
@@ -14,12 +23,33 @@ export const getProfile = asyncHandler(
       include: [
         {
           model: Candidate,
-          as: "candidate",
+          as: "candidateProfile",
+          include: [
+            {
+              model: Experience,
+              as: "experiences",
+              order: [["start_date", "DESC"]],
+            },
+            {
+              model: Education,
+              as: "education",
+              order: [["start_date", "DESC"]],
+            },
+            {
+              model: CandidateSkill,
+              as: "candidateSkills",
+              order: [
+                ["is_primary", "DESC"],
+                ["category", "ASC"],
+                ["skill_name", "ASC"],
+              ],
+            },
+          ],
         },
       ],
     });
 
-    if (!user || !user.candidate) {
+    if (!user || !(user as any).candidateProfile) {
       throw createError("Candidate profile not found", 404);
     }
 
@@ -32,7 +62,7 @@ export const getProfile = asyncHandler(
           status: user.status,
           email_verified: user.email_verified,
         },
-        profile: user.candidate,
+        profile: (user as any).candidateProfile,
       },
     });
   }

@@ -8,7 +8,11 @@ import { Vendor } from "./Vendor";
 import { Job } from "./Job";
 import { Submission } from "./Submission";
 import { Interview } from "./Interview";
+import { Placement } from "./Placement";
 import { Task } from "./Task";
+import { Experience } from "./Experience";
+import { Education } from "./Education";
+import { CandidateSkill } from "./CandidateSkill";
 
 let associationsApplied = false;
 
@@ -49,11 +53,30 @@ export function applyAssociations() {
   });
   Interview.belongsTo(User, { foreignKey: "created_by", as: "creator" });
 
+  // Placements
+  Placement.belongsTo(Job, { foreignKey: "job_id", as: "job" });
+  Placement.belongsTo(Candidate, { foreignKey: "candidate_id", as: "candidate" });
+  Placement.belongsTo(Submission, { foreignKey: "submission_id", as: "submission" });
+  Placement.belongsTo(User, { foreignKey: "recruiter_id", as: "recruiter" });
+  Placement.belongsTo(User, { foreignKey: "vendor_id", as: "vendor" });
+  Placement.belongsTo(User, { foreignKey: "created_by", as: "creator" });
+
   // Tasks
   Task.belongsTo(User, { foreignKey: "assigned_to", as: "assignee" });
   Task.belongsTo(User, { foreignKey: "created_by", as: "creator" });
   Task.belongsTo(Job, { foreignKey: "job_id", as: "job" });
   Task.belongsTo(Submission, { foreignKey: "submission_id", as: "submission" });
+
+  // Candidate Experience & Education
+  Candidate.hasMany(Experience, { foreignKey: "candidate_id", as: "experiences" });
+  Experience.belongsTo(Candidate, { foreignKey: "candidate_id", as: "candidate" });
+
+  Candidate.hasMany(Education, { foreignKey: "candidate_id", as: "education" });
+  Education.belongsTo(Candidate, { foreignKey: "candidate_id", as: "candidate" });
+
+  // Candidate Skills
+  Candidate.hasMany(CandidateSkill, { foreignKey: "candidate_id", as: "candidateSkills" });
+  CandidateSkill.belongsTo(Candidate, { foreignKey: "candidate_id", as: "candidate" });
 }
 
 // Export models & sequelize
@@ -65,6 +88,10 @@ export {
   Job,
   Submission,
   Interview,
+  Placement,
   Task,
+  Experience,
+  Education,
+  CandidateSkill,
   sequelize,
 };
