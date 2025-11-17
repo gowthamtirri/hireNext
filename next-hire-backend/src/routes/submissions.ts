@@ -20,6 +20,7 @@ const createSubmissionValidation = [
     .isUUID()
     .withMessage("Valid job ID is required"),
   body("candidate_id")
+    .optional()
     .isUUID()
     .withMessage("Valid candidate ID is required"),
   body("cover_letter")

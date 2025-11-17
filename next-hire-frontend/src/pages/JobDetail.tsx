@@ -58,6 +58,7 @@ import {
   ArrowLeft,
   Loader2,
   AlertCircle,
+  Activity,
 } from "lucide-react";
 import {
   Dialog,
@@ -1024,7 +1025,7 @@ const JobDetail = () => {
                       <div>
                         <p className="text-sm text-gray-600">Industry</p>
                         <p className="font-semibold text-gray-800">
-                          Technology
+                          {(job as any).industry || "Technology"}
                         </p>
                       </div>
                       <div>
@@ -1397,124 +1398,69 @@ const JobDetail = () => {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-gray-700">
-                            7/24/2025 15:06:08
+                            {job.created_at
+                              ? new Date(job.created_at).toLocaleString()
+                              : "-"}
                           </TableCell>
                           <TableCell className="text-gray-700">
-                            7/24/2025 16:21:08
+                            {job.updated_at
+                              ? new Date(job.updated_at).toLocaleString()
+                              : "-"}
                           </TableCell>
                           <TableCell className="text-gray-700 font-medium">
-                            1.25
+                            {job.created_at && job.updated_at
+                              ? (
+                                  (new Date(job.updated_at).getTime() -
+                                    new Date(job.created_at).getTime()) /
+                                  (1000 * 60 * 60)
+                                ).toFixed(2)
+                              : "-"}
                           </TableCell>
                           <TableCell className="text-gray-700">-</TableCell>
                           <TableCell className="text-gray-700">-</TableCell>
                         </TableRow>
-                        <TableRow className="border-green-100/50 hover:bg-green-50/30 bg-green-50/20">
-                          <TableCell>
-                            <Badge className="bg-blue-100 text-blue-800 border-blue-200">
-                              Assigned
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-gray-700">
-                            7/24/2025 16:21:08
-                          </TableCell>
-                          <TableCell className="text-gray-700">
-                            7/25/2025 8:41:32
-                          </TableCell>
-                          <TableCell className="text-gray-700 font-medium">
-                            16.34
-                          </TableCell>
-                          <TableCell className="text-gray-700">-</TableCell>
-                          <TableCell className="text-gray-700">-</TableCell>
-                        </TableRow>
+                        {job.status === "active" && (
+                          <TableRow className="border-green-100/50 hover:bg-green-50/30 bg-green-50/20">
+                            <TableCell>
+                              <Badge className="bg-blue-100 text-blue-800 border-blue-200">
+                                Active
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-gray-700">
+                              {job.updated_at
+                                ? new Date(job.updated_at).toLocaleString()
+                                : "-"}
+                            </TableCell>
+                            <TableCell className="text-gray-700">
+                              Current
+                            </TableCell>
+                            <TableCell className="text-gray-700 font-medium">
+                              {job.updated_at
+                                ? (
+                                    (new Date().getTime() -
+                                      new Date(job.updated_at).getTime()) /
+                                    (1000 * 60 * 60)
+                                  ).toFixed(2)
+                                : "-"}
+                            </TableCell>
+                            <TableCell className="text-gray-700">-</TableCell>
+                            <TableCell className="text-gray-700">-</TableCell>
+                          </TableRow>
+                        )}
+                        {/* Additional timeline data would come from backend submissions/interviews API */}
                         <TableRow className="border-green-100/50 hover:bg-green-50/30">
-                          <TableCell>
-                            <Badge className="bg-purple-100 text-purple-800 border-purple-200">
-                              Internal Submission
-                            </Badge>
+                          <TableCell
+                            colSpan={6}
+                            className="text-center text-gray-500 py-8"
+                          >
+                            <div className="flex flex-col items-center gap-2">
+                              <Activity className="h-8 w-8 text-gray-400" />
+                              <p>
+                                Additional timeline data will be loaded from
+                                submissions and interviews
+                              </p>
+                            </div>
                           </TableCell>
-                          <TableCell className="text-gray-700">
-                            7/25/2025 8:41:32
-                          </TableCell>
-                          <TableCell className="text-gray-700">
-                            7/25/2025 12:15:08
-                          </TableCell>
-                          <TableCell className="text-gray-700 font-medium">
-                            3.56
-                          </TableCell>
-                          <TableCell className="text-gray-700">-</TableCell>
-                          <TableCell className="text-gray-700">-</TableCell>
-                        </TableRow>
-                        <TableRow className="border-green-100/50 hover:bg-green-50/30 bg-green-50/20">
-                          <TableCell>
-                            <Badge className="bg-orange-100 text-orange-800 border-orange-200">
-                              Client Submission
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-gray-700">
-                            7/25/2025 12:15:08
-                          </TableCell>
-                          <TableCell className="text-gray-700">
-                            7/26/2025 9:38:32
-                          </TableCell>
-                          <TableCell className="text-gray-700 font-medium">
-                            21.39
-                          </TableCell>
-                          <TableCell className="text-gray-700">-</TableCell>
-                          <TableCell className="text-gray-700">-</TableCell>
-                        </TableRow>
-                        <TableRow className="border-green-100/50 hover:bg-green-50/30">
-                          <TableCell>
-                            <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">
-                              Interview
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-gray-700">
-                            7/26/2025 9:38:32
-                          </TableCell>
-                          <TableCell className="text-gray-700">
-                            7/27/2025 22:08:32
-                          </TableCell>
-                          <TableCell className="text-gray-700 font-medium">
-                            36.50
-                          </TableCell>
-                          <TableCell className="text-gray-700">-</TableCell>
-                          <TableCell className="text-gray-700">-</TableCell>
-                        </TableRow>
-                        <TableRow className="border-green-100/50 hover:bg-green-50/30 bg-green-50/20">
-                          <TableCell>
-                            <Badge className="bg-indigo-100 text-indigo-800 border-indigo-200">
-                              Confirmation
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-gray-700">
-                            7/27/2025 22:08:32
-                          </TableCell>
-                          <TableCell className="text-gray-700">
-                            7/30/2025 22:24:44
-                          </TableCell>
-                          <TableCell className="text-gray-700 font-medium">
-                            72.27
-                          </TableCell>
-                          <TableCell className="text-gray-700">-</TableCell>
-                          <TableCell className="text-gray-700">-</TableCell>
-                        </TableRow>
-                        <TableRow className="border-green-100/50 hover:bg-green-50/30">
-                          <TableCell>
-                            <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200">
-                              Placement
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-gray-700">
-                            7/30/2025 22:24:44
-                          </TableCell>
-                          <TableCell className="text-gray-700">
-                            8/6/2025 22:36:08
-                          </TableCell>
-                          <TableCell className="text-gray-700 font-medium">
-                            168.19
-                          </TableCell>
-                          <TableCell className="text-gray-700">-</TableCell>
-                          <TableCell className="text-gray-700">-</TableCell>
                         </TableRow>
                       </TableBody>
                     </Table>
@@ -1532,51 +1478,68 @@ const JobDetail = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold text-gray-800">
-                      319.5 hrs
+                      {job.created_at
+                        ? `${(
+                            (new Date().getTime() -
+                              new Date(job.created_at).getTime()) /
+                            (1000 * 60 * 60)
+                          ).toFixed(1)} hrs`
+                        : "N/A"}
                     </div>
-                    <p className="text-xs text-gray-600">
-                      From creation to placement
-                    </p>
+                    <p className="text-xs text-gray-600">Since job creation</p>
                   </CardContent>
                 </Card>
 
                 <Card className="card-gradient border-purple-200/50 shadow-lg">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm bg-gradient-to-r from-purple-700 to-purple-600 bg-clip-text text-transparent">
-                      Avg Stage Time
+                      Applications
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold text-gray-800">
-                      45.6 hrs
+                      {/* This will be loaded from submissions API */}0
                     </div>
-                    <p className="text-xs text-gray-600">Average per stage</p>
+                    <p className="text-xs text-gray-600">Total applications</p>
                   </CardContent>
                 </Card>
 
                 <Card className="card-gradient border-orange-200/50 shadow-lg">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm bg-gradient-to-r from-orange-700 to-orange-600 bg-clip-text text-transparent">
-                      Longest Stage
+                      Positions
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold text-gray-800">
-                      168.2 hrs
+                      {job.positions_available || 1}
                     </div>
-                    <p className="text-xs text-gray-600">Placement stage</p>
+                    <p className="text-xs text-gray-600">Available positions</p>
                   </CardContent>
                 </Card>
 
                 <Card className="card-gradient border-green-200/50 shadow-lg">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm bg-gradient-to-r from-green-700 to-green-600 bg-clip-text text-transparent">
-                      Efficiency Score
+                      Priority
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold text-green-600">85%</div>
-                    <p className="text-xs text-gray-600">Above average</p>
+                    <div
+                      className={`text-2xl font-bold ${
+                        job.priority === "high"
+                          ? "text-red-600"
+                          : job.priority === "medium"
+                          ? "text-yellow-600"
+                          : "text-green-600"
+                      }`}
+                    >
+                      {job.priority
+                        ? job.priority.charAt(0).toUpperCase() +
+                          job.priority.slice(1)
+                        : "Medium"}
+                    </div>
+                    <p className="text-xs text-gray-600">Job priority</p>
                   </CardContent>
                 </Card>
               </div>

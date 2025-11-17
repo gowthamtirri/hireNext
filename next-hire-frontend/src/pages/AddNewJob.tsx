@@ -63,7 +63,7 @@ const AddNewJob = () => {
       experienceMax: "",
       educationRequirements: "",
       priority: "",
-      jobStatus: "draft",
+      jobStatus: "Active",
       positionsAvailable: "1",
       maxSubmissionsAllowed: "",
       vendorEligible: true,
@@ -327,7 +327,7 @@ const AddNewJob = () => {
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <FormField
                 control={form.control}
                 name="city"
@@ -348,18 +348,35 @@ const AddNewJob = () => {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-gray-700 font-medium">State</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g. CA" className="border-gray-200 focus:border-green-400" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="country"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-gray-700 font-medium">Country</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger className="border-gray-200 focus:border-green-400">
-                          <SelectValue placeholder="Select state" />
+                          <SelectValue placeholder="Select country" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent className="bg-white">
-                        <SelectItem value="CA">California</SelectItem>
-                        <SelectItem value="NY">New York</SelectItem>
-                        <SelectItem value="TX">Texas</SelectItem>
-                        <SelectItem value="FL">Florida</SelectItem>
-                        <SelectItem value="WA">Washington</SelectItem>
+                        <SelectItem value="US">United States</SelectItem>
+                        <SelectItem value="CA">Canada</SelectItem>
+                        <SelectItem value="UK">United Kingdom</SelectItem>
+                        <SelectItem value="AU">Australia</SelectItem>
+                        <SelectItem value="IN">India</SelectItem>
+                        <SelectItem value="DE">Germany</SelectItem>
+                        <SelectItem value="FR">France</SelectItem>
+                        <SelectItem value="SG">Singapore</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />

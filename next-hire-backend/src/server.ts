@@ -24,6 +24,7 @@ import skillsRoutes from "./routes/skills";
 import candidateSearchRoutes from "./routes/candidateSearch";
 import interviewRoutes from "./routes/interviews";
 import placementRoutes from "./routes/placements";
+import businessPartnerRoutes from "./routes/businessPartners";
 import dashboardRoutes from "./routes/dashboard";
 
 // Load environment variables
@@ -90,6 +91,7 @@ app.use(`/api/${API_VERSION}/skills`, skillsRoutes);
 app.use(`/api/${API_VERSION}/candidate-search`, candidateSearchRoutes);
 app.use(`/api/${API_VERSION}/interviews`, interviewRoutes);
 app.use(`/api/${API_VERSION}/placements`, placementRoutes);
+app.use(`/api/${API_VERSION}/business-partners`, businessPartnerRoutes);
 app.use(`/api/${API_VERSION}/dashboard`, dashboardRoutes);
 
 // Error handling middleware

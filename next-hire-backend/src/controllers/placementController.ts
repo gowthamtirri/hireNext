@@ -1,6 +1,6 @@
 import { Response } from "express";
 import { Op } from "sequelize";
-import { Placement, Job, Candidate, Submission, User } from "../models";
+import { Placement, Job, Candidate, Submission, User, Recruiter } from "../models";
 import { logger } from "../utils/logger";
 import { AuthenticatedRequest } from "../middleware/auth";
 
@@ -20,8 +20,8 @@ export const getPlacements = async (req: AuthenticatedRequest, res: Response) =>
       sort_order = "DESC",
     } = req.query;
 
-    const userId = req.userId;
-    const userRole = req.userRole;
+    const userId = req.user?.userId;
+    const userRole = req.user?.role;
 
     if (!userId) {
       return res.status(401).json({
@@ -107,7 +107,7 @@ export const getPlacements = async (req: AuthenticatedRequest, res: Response) =>
         {
           model: Candidate,
           as: "candidate",
-          attributes: ["id", "first_name", "last_name", "email", "phone"],
+          attributes: ["id", "first_name", "last_name", "phone"],
         },
         {
           model: Submission,
@@ -120,7 +120,7 @@ export const getPlacements = async (req: AuthenticatedRequest, res: Response) =>
           attributes: ["id", "email"],
           include: [
             {
-              model: require("../models").Recruiter,
+              model: Recruiter,
               as: "recruiterProfile",
               attributes: ["first_name", "last_name"],
             },
@@ -167,8 +167,8 @@ export const getPlacements = async (req: AuthenticatedRequest, res: Response) =>
 export const getPlacementById = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const userId = req.userId;
-    const userRole = req.userRole;
+    const userId = req.user?.userId;
+    const userRole = req.user?.role;
 
     if (!userId) {
       return res.status(401).json({
@@ -219,7 +219,7 @@ export const getPlacementById = async (req: AuthenticatedRequest, res: Response)
           attributes: ["id", "email"],
           include: [
             {
-              model: require("../models").Recruiter,
+              model: Recruiter,
               as: "recruiterProfile",
               attributes: ["first_name", "last_name", "phone"],
             },
@@ -299,8 +299,8 @@ export const createPlacement = async (req: AuthenticatedRequest, res: Response) 
       notes,
     } = req.body;
 
-    const userId = req.userId;
-    const userRole = req.userRole;
+    const userId = req.user?.userId;
+    const userRole = req.user?.role;
 
     if (!userId || userRole !== "recruiter") {
       return res.status(403).json({
@@ -374,7 +374,7 @@ export const createPlacement = async (req: AuthenticatedRequest, res: Response) 
       job_id,
       candidate_id,
       submission_id,
-      recruiter_id: userId,
+      recruiter_id: userId!,
       vendor_id,
       start_date: new Date(start_date),
       end_date: end_date ? new Date(end_date) : undefined,
@@ -389,7 +389,9 @@ export const createPlacement = async (req: AuthenticatedRequest, res: Response) 
       reporting_manager,
       department,
       notes,
-      created_by: userId,
+      status: "active",
+      onboarding_status: "pending",
+      created_by: userId!,
     });
 
     // Update submission status to hired
@@ -410,7 +412,7 @@ export const createPlacement = async (req: AuthenticatedRequest, res: Response) 
         {
           model: Candidate,
           as: "candidate",
-          attributes: ["id", "first_name", "last_name", "email"],
+            attributes: ["id", "first_name", "last_name"],
         },
         {
           model: Submission,
@@ -438,8 +440,8 @@ export const createPlacement = async (req: AuthenticatedRequest, res: Response) 
 export const updatePlacement = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const userId = req.userId;
-    const userRole = req.userRole;
+    const userId = req.user?.userId;
+    const userRole = req.user?.role;
 
     if (!userId || userRole !== "recruiter") {
       return res.status(403).json({
@@ -504,7 +506,7 @@ export const updatePlacement = async (req: AuthenticatedRequest, res: Response) 
         {
           model: Candidate,
           as: "candidate",
-          attributes: ["id", "first_name", "last_name", "email"],
+            attributes: ["id", "first_name", "last_name"],
         },
       ],
     });
@@ -527,8 +529,8 @@ export const updatePlacement = async (req: AuthenticatedRequest, res: Response) 
 export const deletePlacement = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const userId = req.userId;
-    const userRole = req.userRole;
+    const userId = req.user?.userId;
+    const userRole = req.user?.role;
 
     if (!userId || userRole !== "recruiter") {
       return res.status(403).json({
@@ -572,8 +574,8 @@ export const deletePlacement = async (req: AuthenticatedRequest, res: Response) 
 // Get placement statistics
 export const getPlacementStats = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const userId = req.userId;
-    const userRole = req.userRole;
+    const userId = req.user?.userId;
+    const userRole = req.user?.role;
 
     if (!userId || userRole !== "recruiter") {
       return res.status(403).json({
@@ -657,8 +659,8 @@ export const terminatePlacement = async (req: AuthenticatedRequest, res: Respons
   try {
     const { id } = req.params;
     const { termination_reason, termination_date } = req.body;
-    const userId = req.userId;
-    const userRole = req.userRole;
+    const userId = req.user?.userId;
+    const userRole = req.user?.role;
 
     if (!userId || userRole !== "recruiter") {
       return res.status(403).json({
@@ -708,8 +710,8 @@ export const updateOnboardingStatus = async (req: AuthenticatedRequest, res: Res
   try {
     const { id } = req.params;
     const { onboarding_status } = req.body;
-    const userId = req.userId;
-    const userRole = req.userRole;
+    const userId = req.user?.userId;
+    const userRole = req.user?.role;
 
     if (!userId || userRole !== "recruiter") {
       return res.status(403).json({

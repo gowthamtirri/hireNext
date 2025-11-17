@@ -13,44 +13,63 @@ import {
   Activity,
   PieChart,
   LineChart,
-  ArrowRight
+  ArrowRight,
+  Loader2,
+  AlertCircle,
+  RefreshCw
 } from "lucide-react";
+import { useDashboard } from "@/hooks/useDashboard";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Dashboards = () => {
-  const dashboardMetrics = [
-    {
-      title: "Total Revenue",
-      value: "$124,500",
-      change: "+12.5%",
-      icon: DollarSign,
-      color: "from-green-400/30 via-green-500/20 to-green-600/30",
-      iconColor: "text-green-700"
-    },
-    {
-      title: "Active Placements",
-      value: "87",
-      change: "+8.2%",
-      icon: Target,
-      color: "from-blue-400/30 via-blue-500/20 to-blue-600/30",
-      iconColor: "text-blue-700"
-    },
-    {
-      title: "Success Rate",
-      value: "94.3%",
-      change: "+2.1%",
-      icon: TrendingUp,
-      color: "from-purple-400/30 via-purple-500/20 to-purple-600/30",
-      iconColor: "text-purple-700"
-    },
-    {
-      title: "Response Time",
-      value: "2.4h",
-      change: "-15%",
-      icon: Clock,
-      color: "from-orange-400/30 via-orange-500/20 to-orange-600/30",
-      iconColor: "text-orange-700"
-    }
-  ];
+  const { user } = useAuth();
+  const { stats, loading, error, refresh } = useDashboard();
+
+  // Create dynamic metrics based on real data
+  const getDashboardMetrics = () => {
+    if (!stats) return [];
+
+    const successRate = stats.overview.totalSubmissions > 0 
+      ? ((stats.overview.totalPlacements || 0) / stats.overview.totalSubmissions * 100).toFixed(1)
+      : "0";
+
+    return [
+      {
+        title: "Total Jobs",
+        value: stats.overview.totalJobs?.toString() || "0",
+        change: "+12.5%", // This could be calculated from historical data
+        icon: Briefcase,
+        color: "from-green-400/30 via-green-500/20 to-green-600/30",
+        iconColor: "text-green-700"
+      },
+      {
+        title: "Active Placements",
+        value: stats.overview.totalPlacements?.toString() || "0",
+        change: "+8.2%",
+        icon: Target,
+        color: "from-blue-400/30 via-blue-500/20 to-blue-600/30",
+        iconColor: "text-blue-700"
+      },
+      {
+        title: "Success Rate",
+        value: `${successRate}%`,
+        change: "+2.1%",
+        icon: TrendingUp,
+        color: "from-purple-400/30 via-purple-500/20 to-purple-600/30",
+        iconColor: "text-purple-700"
+      },
+      {
+        title: "Total Submissions",
+        value: stats.overview.totalSubmissions?.toString() || "0",
+        change: "+15%",
+        icon: Users,
+        color: "from-orange-400/30 via-orange-500/20 to-orange-600/30",
+        iconColor: "text-orange-700"
+      }
+    ];
+  };
+
+  const dashboardMetrics = getDashboardMetrics();
 
   const dashboardCards = [
     {
@@ -118,31 +137,76 @@ const Dashboards = () => {
             </div>
           </div>
         </div>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={refresh} 
+            disabled={loading}
+            className="border-green-200 hover:bg-green-50"
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Key Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        {dashboardMetrics.map((metric, index) => {
-          const IconComponent = metric.icon;
-          return (
-            <Card key={index} className="relative overflow-hidden border-0 shadow-md hover:shadow-lg transition-all duration-500 hover:-translate-y-1 group cursor-pointer backdrop-blur-xl bg-white/20">
-              <div className={`absolute inset-0 bg-gradient-to-br ${metric.color}`}></div>
-              <div className="absolute inset-0 bg-gradient-to-br from-white/40 via-white/20 to-transparent"></div>
+        {loading ? (
+          // Loading skeleton
+          Array.from({ length: 4 }).map((_, index) => (
+            <Card key={index} className="relative overflow-hidden border-0 shadow-md backdrop-blur-xl bg-white/20">
               <CardHeader className="relative flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-semibold font-roboto-slab text-gray-800">{metric.title}</CardTitle>
-                <div className="p-2 rounded-full bg-white/30 backdrop-blur-sm shadow-sm group-hover:bg-white/40 transition-all border border-white/20">
-                  <IconComponent className={`h-4 w-4 ${metric.iconColor}`} />
+                <div className="h-4 w-20 bg-gray-200 rounded animate-pulse"></div>
+                <div className="p-2 rounded-full bg-gray-200 animate-pulse">
+                  <div className="h-4 w-4 bg-gray-300 rounded"></div>
                 </div>
               </CardHeader>
               <CardContent className="relative pt-1">
-                <div className="text-2xl font-bold text-gray-800 font-roboto-slab mb-1">{metric.value}</div>
-                <p className="text-xs text-green-600 font-roboto-slab font-medium">
-                  {metric.change} from last month
-                </p>
+                <div className="h-8 w-16 bg-gray-200 rounded animate-pulse mb-1"></div>
+                <div className="h-3 w-24 bg-gray-200 rounded animate-pulse"></div>
               </CardContent>
             </Card>
-          );
-        })}
+          ))
+        ) : error ? (
+          <div className="col-span-full">
+            <Card className="border-red-200 bg-red-50">
+              <CardContent className="flex items-center justify-center py-8">
+                <div className="text-center">
+                  <AlertCircle className="h-8 w-8 text-red-500 mx-auto mb-2" />
+                  <p className="text-red-600 mb-2">Failed to load dashboard metrics</p>
+                  <Button onClick={refresh} variant="outline" size="sm">
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Retry
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        ) : (
+          dashboardMetrics.map((metric, index) => {
+            const IconComponent = metric.icon;
+            return (
+              <Card key={index} className="relative overflow-hidden border-0 shadow-md hover:shadow-lg transition-all duration-500 hover:-translate-y-1 group cursor-pointer backdrop-blur-xl bg-white/20">
+                <div className={`absolute inset-0 bg-gradient-to-br ${metric.color}`}></div>
+                <div className="absolute inset-0 bg-gradient-to-br from-white/40 via-white/20 to-transparent"></div>
+                <CardHeader className="relative flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-semibold font-roboto-slab text-gray-800">{metric.title}</CardTitle>
+                  <div className="p-2 rounded-full bg-white/30 backdrop-blur-sm shadow-sm group-hover:bg-white/40 transition-all border border-white/20">
+                    <IconComponent className={`h-4 w-4 ${metric.iconColor}`} />
+                  </div>
+                </CardHeader>
+                <CardContent className="relative pt-1">
+                  <div className="text-2xl font-bold text-gray-800 font-roboto-slab mb-1">{metric.value}</div>
+                  <p className="text-xs text-green-600 font-roboto-slab font-medium">
+                    {metric.change} from last month
+                  </p>
+                </CardContent>
+              </Card>
+            );
+          })
+        )}
       </div>
 
       {/* Dashboard Cards */}

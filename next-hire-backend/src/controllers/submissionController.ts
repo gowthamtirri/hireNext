@@ -16,7 +16,7 @@ export const createSubmission = asyncHandler(async (req: AuthRequest, res: Respo
 
   const {
     job_id,
-    candidate_id,
+    candidate_id: providedCandidateId,
     cover_letter,
     resume_url,
     expected_salary,
@@ -43,15 +43,29 @@ export const createSubmission = asyncHandler(async (req: AuthRequest, res: Respo
     throw createError("This job is not open to vendor submissions", 403);
   }
 
-  // Verify candidate exists
-  const candidate = await Candidate.findByPk(candidate_id);
-  if (!candidate) {
-    throw createError("Candidate not found", 404);
-  }
+  // Get candidate ID based on user role
+  let candidate_id: string;
+  let candidate: any;
 
-  // For candidates, ensure they can only submit their own application
-  if (userRole === "candidate" && candidate.user_id !== userId) {
-    throw createError("You can only submit your own application", 403);
+  if (userRole === "candidate") {
+    // For candidates, find their own candidate profile
+    candidate = await Candidate.findOne({ where: { user_id: userId } });
+    if (!candidate) {
+      throw createError("Candidate profile not found", 404);
+    }
+    candidate_id = candidate.id;
+  } else if (userRole === "vendor") {
+    // For vendors, use the provided candidate_id
+    if (!providedCandidateId) {
+      throw createError("Valid candidate ID is required", 400);
+    }
+    candidate = await Candidate.findByPk(providedCandidateId);
+    if (!candidate) {
+      throw createError("Candidate not found", 404);
+    }
+    candidate_id = providedCandidateId;
+  } else {
+    throw createError("Invalid user role for submission", 403);
   }
 
   // Check if already applied
@@ -101,7 +115,7 @@ export const createSubmission = asyncHandler(async (req: AuthRequest, res: Respo
       {
         model: Candidate,
         as: "candidate",
-        attributes: ["id", "first_name", "last_name", "email", "phone"],
+        attributes: ["id", "first_name", "last_name", "phone"],
       },
       {
         model: User,
@@ -228,7 +242,7 @@ export const getVendorSubmissions = asyncHandler(async (req: AuthRequest, res: R
       {
         model: Candidate,
         as: "candidate",
-        attributes: ["id", "first_name", "last_name", "email", "phone"],
+        attributes: ["id", "first_name", "last_name", "phone"],
       },
     ],
     order: [["submitted_at", "DESC"]],
@@ -300,7 +314,14 @@ export const getJobSubmissions = asyncHandler(async (req: AuthRequest, res: Resp
     {
       model: Candidate,
       as: "candidate",
-      attributes: ["id", "first_name", "last_name", "email", "phone", "location", "experience_years"],
+      attributes: ["id", "first_name", "last_name", "phone", "location", "experience_years"],
+      include: [
+        {
+          model: User,
+          as: "user",
+          attributes: ["id", "email"],
+        },
+      ],
     },
     {
       model: User,
@@ -310,7 +331,7 @@ export const getJobSubmissions = asyncHandler(async (req: AuthRequest, res: Resp
         {
           model: Vendor,
           as: "vendorProfile",
-          attributes: ["company_name", "contact_name"],
+          attributes: ["company_name", "contact_person_name"],
           required: false,
         },
       ],

@@ -35,46 +35,61 @@ import {
   RotateCcw,
   ExternalLink,
   Pencil,
+  Loader2,
+  AlertCircle,
+  RefreshCw,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import businessPartnersData from "@/data/business-partners.json";
+import { useBusinessPartners, useBusinessPartnerStats } from "@/hooks/useBusinessPartners";
+import { businessPartnerService } from "@/services/businessPartnerService";
+import { useAuth } from "@/contexts/AuthContext";
 
 const BusinessPartners = () => {
   const navigate = useNavigate();
-  const { businessPartners } = businessPartnersData;
+  const { user } = useAuth();
+  
+  // Hooks
+  const {
+    businessPartners,
+    loading,
+    error,
+    pagination,
+    fetchBusinessPartners,
+    refresh
+  } = useBusinessPartners();
+
+  const {
+    stats,
+    loading: statsLoading,
+    refresh: refreshStats
+  } = useBusinessPartnerStats();
+
   const [activeFilters, setActiveFilters] = useState<Record<string, string[]>>({});
 
-  const totalPartners = businessPartners.length;
-  const leads = businessPartners.filter(partner => partner.lead).length;
-  const clients = businessPartners.filter(partner => partner.client).length;
-  const vendors = businessPartners.filter(partner => partner.vendor).length;
-  const activePartners = businessPartners.filter(partner => partner.status === "Active").length;
+  // Calculate stats from real data
+  const totalPartners = stats?.totalPartners || 0;
+  const leads = stats?.leads || 0;
+  const clients = stats?.clients || 0;
+  const vendors = stats?.vendors || 0;
+  const activePartners = stats?.activePartners || 0;
 
   const handleLeadsClick = () => {
-    setActiveFilters({
-      lead: ["true"]
-    });
+    fetchBusinessPartners({ partner_type: "lead" });
   };
 
   const handleClientsClick = () => {
-    setActiveFilters({
-      client: ["true"]
-    });
+    fetchBusinessPartners({ partner_type: "client" });
   };
 
   const handleVendorsClick = () => {
-    setActiveFilters({
-      vendor: ["true"]
-    });
+    fetchBusinessPartners({ partner_type: "vendor" });
   };
 
   const handleActiveClick = () => {
-    setActiveFilters({
-      status: ["Active"]
-    });
+    fetchBusinessPartners({ status: "active" });
   };
 
-  const handleViewDetails = (partnerId: number) => {
+  const handleViewDetails = (partnerId: string) => {
     navigate(`/dashboard/business-partners/${partnerId}`);
   };
 
@@ -85,7 +100,7 @@ const BusinessPartners = () => {
       icon: Building2,
       color: "text-blue-700",
       gradientOverlay: "bg-gradient-to-br from-blue-400/30 via-blue-500/20 to-blue-600/30",
-      onClick: () => setActiveFilters({})
+      onClick: () => fetchBusinessPartners({})
     },
     {
       title: "Leads",
@@ -121,38 +136,26 @@ const BusinessPartners = () => {
     }
   ];
 
+  // Helper functions now use the service
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Active': return 'bg-green-100 text-green-800 border-green-200';
-      case 'Prospect': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'Inactive': return 'bg-gray-100 text-gray-800 border-gray-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
+    return businessPartnerService.getStatusColor(status as any);
   };
 
   const getPartnerType = (partner: any) => {
-    const types = [];
-    if (partner.lead) types.push('Lead');
-    if (partner.client) types.push('Client');
-    if (partner.vendor) types.push('Vendor');
-    return types.join(', ') || 'Partner';
+    return businessPartnerService.getPartnerType(partner);
   };
 
   const getPartnerTypeColor = (partner: any) => {
-    if (partner.lead && partner.client) return 'bg-purple-100 text-purple-800 border-purple-200';
-    if (partner.lead) return 'bg-green-100 text-green-800 border-green-200';
-    if (partner.client) return 'bg-blue-100 text-blue-800 border-blue-200';
-    if (partner.vendor) return 'bg-orange-100 text-orange-800 border-orange-200';
-    return 'bg-gray-100 text-gray-800 border-gray-200';
+    return businessPartnerService.getPartnerTypeColor(partner);
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString();
+    return businessPartnerService.formatDate(dateString);
   };
 
   const columns = [
     {
-      field: 'businessPartnerNumber',
+      field: 'business_partner_number',
       headerName: 'BP #',
       width: 80,
       renderCell: (value: string, row: any) => (
@@ -228,7 +231,7 @@ const BusinessPartners = () => {
       )
     },
     {
-      field: 'primaryEmail',
+      field: 'primary_email',
       headerName: 'Contact',
       width: 180,
       renderCell: (value: string, row: any) => (
@@ -242,12 +245,12 @@ const BusinessPartners = () => {
             <span className="truncate font-poppins">{value}</span>
           </a>
           <a 
-            href={`tel:${row.primaryPhone}`}
+            href={`tel:${row.primary_phone}`}
             className="flex items-center gap-1 text-green-600 hover:text-green-800 text-xs"
             onClick={(e) => e.stopPropagation()}
           >
             <Phone className="w-3 h-3" />
-            <span className="font-poppins">{row.primaryPhone}</span>
+            <span className="font-poppins">{row.primary_phone}</span>
           </a>
         </div>
       )
@@ -279,7 +282,7 @@ const BusinessPartners = () => {
       )
     },
     {
-      field: 'createdOn',
+      field: 'created_at',
       headerName: 'Created',
       width: 100,
       renderCell: (value: string) => (
@@ -287,7 +290,7 @@ const BusinessPartners = () => {
       )
     },
     {
-      field: 'lastActivity',
+      field: 'last_activity_at',
       headerName: 'Last Activity',
       width: 100,
       renderCell: (value: string) => (
@@ -295,6 +298,23 @@ const BusinessPartners = () => {
       )
     },
   ];
+
+  // Check if user is authorized
+  if (user?.role !== "recruiter") {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <Card>
+          <CardContent className="p-12 text-center">
+            <AlertCircle className="w-16 h-16 text-yellow-300 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">Access Restricted</h3>
+            <p className="text-gray-600">
+              This page is only available for recruiters.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-2 sm:space-y-3 md:space-y-4 px-1 sm:px-0">
@@ -305,6 +325,16 @@ const BusinessPartners = () => {
           <p className="text-sm text-gray-600 font-roboto-slab">Manage client relationships and partnerships</p>
         </div>
         <div className="flex items-center gap-1 sm:gap-2 w-full sm:w-auto">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={refresh} 
+            disabled={loading}
+            className="border-green-200 hover:bg-green-50 hover:border-green-300 text-xs flex-1 sm:flex-none px-2 sm:px-3"
+          >
+            <RefreshCw className={`w-3 h-3 mr-1 ${loading ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">Refresh</span>
+          </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="border-green-200 hover:bg-green-50 hover:border-green-300 text-xs flex-1 sm:flex-none px-2 sm:px-3">
@@ -392,47 +422,97 @@ const BusinessPartners = () => {
 
       {/* Navigation Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-1 sm:gap-2">
-        {navigationCards.map((card) => {
-          const IconComponent = card.icon;
-          return (
-            <Card 
-              key={card.title} 
-              className="relative overflow-hidden border-0 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 group cursor-pointer backdrop-blur-xl bg-white/20"
-              onClick={card.onClick}
-            >
-              <div className={`absolute inset-0 ${card.gradientOverlay}`}></div>
-              <div className="absolute inset-0 bg-gradient-to-br from-white/40 via-white/20 to-transparent"></div>
+        {statsLoading ? (
+          // Loading skeleton for navigation cards
+          Array.from({ length: 5 }).map((_, index) => (
+            <Card key={index} className="relative overflow-hidden border-0 shadow-sm backdrop-blur-xl bg-white/20">
               <CardContent className="relative p-1.5 sm:p-2">
                 <div className="flex flex-col items-center space-y-1">
-                  <div className="p-1 sm:p-1.5 rounded-full bg-white/30 backdrop-blur-sm shadow-sm group-hover:bg-white/40 transition-all border border-white/20">
-                    <IconComponent className={`h-2.5 w-2.5 sm:h-3 sm:w-3 ${card.color}`} />
+                  <div className="p-1 sm:p-1.5 rounded-full bg-gray-200 animate-pulse">
+                    <div className="h-2.5 w-2.5 sm:h-3 sm:w-3 bg-gray-300 rounded"></div>
                   </div>
-                  <div className="text-center">
-                    <p className="text-xs font-semibold text-gray-600 font-roboto-slab truncate">{card.title}</p>
-                    <p className="text-xs sm:text-sm font-bold text-gray-900 font-roboto-slab">{card.value}</p>
+                  <div className="text-center space-y-1">
+                    <div className="h-3 w-12 bg-gray-200 rounded animate-pulse"></div>
+                    <div className="h-4 w-8 bg-gray-300 rounded animate-pulse"></div>
                   </div>
                 </div>
               </CardContent>
             </Card>
-          );
-        })}
+          ))
+        ) : (
+          navigationCards.map((card) => {
+            const IconComponent = card.icon;
+            return (
+              <Card 
+                key={card.title} 
+                className="relative overflow-hidden border-0 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 group cursor-pointer backdrop-blur-xl bg-white/20"
+                onClick={card.onClick}
+              >
+                <div className={`absolute inset-0 ${card.gradientOverlay}`}></div>
+                <div className="absolute inset-0 bg-gradient-to-br from-white/40 via-white/20 to-transparent"></div>
+                <CardContent className="relative p-1.5 sm:p-2">
+                  <div className="flex flex-col items-center space-y-1">
+                    <div className="p-1 sm:p-1.5 rounded-full bg-white/30 backdrop-blur-sm shadow-sm group-hover:bg-white/40 transition-all border border-white/20">
+                      <IconComponent className={`h-2.5 w-2.5 sm:h-3 sm:w-3 ${card.color}`} />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs font-semibold text-gray-600 font-roboto-slab truncate">{card.title}</p>
+                      <p className="text-xs sm:text-sm font-bold text-gray-900 font-roboto-slab">{card.value}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })
+        )}
       </div>
 
       {/* Data Table */}
       <Card className="border-gray-200 shadow-sm overflow-hidden">
         <CardContent className="p-0">
-          <div className="overflow-x-auto min-h-0">
-            <div className="min-w-full">
-              <DataGrid
-                rows={businessPartners}
-                columns={columns}
-                pageSizeOptions={[5, 10, 25, 50]}
-                checkboxSelection
-                onRowClick={(row) => handleViewDetails(row.id)}
-                initialFilters={activeFilters}
-              />
+          {loading && businessPartners.length === 0 ? (
+            // Loading state
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-green-600" />
+              <span className="ml-2 text-gray-600">Loading business partners...</span>
             </div>
-          </div>
+          ) : error ? (
+            // Error state
+            <div className="text-center py-8">
+              <AlertCircle className="h-8 w-8 text-red-500 mx-auto mb-2" />
+              <p className="text-gray-600 mb-2">{error}</p>
+              <Button onClick={refresh} variant="outline" className="mt-2">
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Try Again
+              </Button>
+            </div>
+          ) : businessPartners.length === 0 ? (
+            // Empty state
+            <div className="text-center py-12">
+              <Building2 className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">No business partners found</h3>
+              <p className="text-gray-600 mb-4">
+                Get started by adding your first business partner.
+              </p>
+              <Button className="bg-green-600 hover:bg-green-700">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Business Partner
+              </Button>
+            </div>
+          ) : (
+            <div className="overflow-x-auto min-h-0">
+              <div className="min-w-full">
+                <DataGrid
+                  rows={businessPartners}
+                  columns={columns}
+                  pageSizeOptions={[5, 10, 25, 50]}
+                  checkboxSelection
+                  onRowClick={(row) => handleViewDetails(row.id)}
+                  initialFilters={activeFilters}
+                />
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

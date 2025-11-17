@@ -72,7 +72,7 @@ export const getInterviews = asyncHandler(async (req: AuthRequest, res: Response
         {
           model: Candidate,
           as: "candidate",
-          attributes: ["id", "first_name", "last_name", "email", "phone"],
+          attributes: ["id", "first_name", "last_name", "phone"],
           include: [
             {
               model: User,
@@ -221,7 +221,7 @@ export const createInterview = asyncHandler(async (req: AuthRequest, res: Respon
           {
             model: Candidate,
             as: "candidate",
-            attributes: ["id", "first_name", "last_name", "email", "phone"],
+            attributes: ["id", "first_name", "last_name", "phone"],
           },
         ],
       },
@@ -338,7 +338,7 @@ export const updateInterview = asyncHandler(async (req: AuthRequest, res: Respon
           {
             model: Candidate,
             as: "candidate",
-            attributes: ["id", "first_name", "last_name", "email"],
+            attributes: ["id", "first_name", "last_name"],
           },
         ],
       },
