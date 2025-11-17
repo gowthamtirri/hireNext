@@ -47,8 +47,8 @@ export const signup = asyncHandler(async (req: Request, res: Response) => {
   const saltRounds = 12;
   const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-  // Generate OTP (hardcoded for development)
-  const otp = "123456"; // generateOTP();
+  // Generate OTP
+  const otp = generateOTP();
   const otpExpiry = generateOTPExpiry();
 
   // Create user
@@ -185,8 +185,8 @@ export const resendOTP = asyncHandler(async (req: Request, res: Response) => {
     throw createError("Email is already verified", 400);
   }
 
-  // Generate new OTP (hardcoded for development)
-  const otp = "123456"; // generateOTP();
+  // Generate new OTP
+  const otp = generateOTP();
   const otpExpiry = generateOTPExpiry();
 
   await user.update({

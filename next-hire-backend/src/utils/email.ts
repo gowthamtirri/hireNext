@@ -1,16 +1,47 @@
 import nodemailer from "nodemailer";
 import { logger } from "./logger";
 
-// Create transporter
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: parseInt(process.env.SMTP_PORT || "587"),
-  secure: process.env.SMTP_SECURE === "true",
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-});
+// Validate email configuration
+const validateEmailConfig = () => {
+  const required = ["SMTP_HOST", "SMTP_USER", "SMTP_PASS", "FROM_EMAIL"];
+  const missing = required.filter((key) => !process.env[key]);
+  
+  if (missing.length > 0) {
+    logger.warn(`Missing email configuration: ${missing.join(", ")}`);
+    return false;
+  }
+  return true;
+};
+
+// Create transporter with validation
+let transporter: nodemailer.Transporter | null = null;
+
+if (validateEmailConfig()) {
+  try {
+    transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: parseInt(process.env.SMTP_PORT || "587"),
+      secure: process.env.SMTP_SECURE === "true",
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+    });
+    
+    // Verify connection
+    transporter.verify((error) => {
+      if (error) {
+        logger.error("Email transporter verification failed:", error);
+      } else {
+        logger.info("Email transporter configured successfully");
+      }
+    });
+  } catch (error) {
+    logger.error("Failed to create email transporter:", error);
+  }
+} else {
+  logger.warn("Email transporter not initialized - missing configuration");
+}
 
 export interface EmailOptions {
   to: string;
@@ -20,9 +51,20 @@ export interface EmailOptions {
 }
 
 export const sendEmail = async (options: EmailOptions): Promise<boolean> => {
+  if (!transporter) {
+    logger.error("Email transporter not configured. Please check your .env file.");
+    return false;
+  }
+
+  if (!process.env.FROM_EMAIL) {
+    logger.error("FROM_EMAIL not configured in environment variables");
+    return false;
+  }
+
   try {
+    const fromName = process.env.FROM_NAME || "The Next Hire";
     const mailOptions = {
-      from: `${process.env.FROM_NAME} <${process.env.FROM_EMAIL}>`,
+      from: `${fromName} <${process.env.FROM_EMAIL}>`,
       to: options.to,
       subject: options.subject,
       html: options.html,
@@ -32,8 +74,12 @@ export const sendEmail = async (options: EmailOptions): Promise<boolean> => {
     await transporter.sendMail(mailOptions);
     logger.info(`Email sent successfully to ${options.to}`);
     return true;
-  } catch (error) {
-    logger.error("Failed to send email:", error);
+  } catch (error: any) {
+    logger.error("Failed to send email:", {
+      error: error.message,
+      to: options.to,
+      subject: options.subject,
+    });
     return false;
   }
 };
