@@ -98,6 +98,8 @@ import { format } from "date-fns";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useJob } from "@/hooks/useJobs";
+import { jobService } from "@/services/jobService";
+import { recruiterService } from "@/services/recruiterService";
 
 // Local type definitions
 interface Document {
@@ -121,6 +123,10 @@ const JobDetail = () => {
   const { job, loading, error, refresh } = useJob(id || null, false); // Use private endpoint for recruiters
   const [activeTab, setActiveTab] = useState("overview");
   const { toast } = useToast();
+
+  // Local state for edit operations
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [localJob, setLocalJob] = useState(null);
 
   // Edit mode state
   const [isEditMode, setIsEditMode] = useState(
@@ -182,12 +188,74 @@ const JobDetail = () => {
     }
   }, [searchParams]);
 
-  const handleSave = () => {
-    // Here you would save the editedJob data to your backend
-    console.log("Saving job data:", editedJob);
-    setIsEditMode(false);
-    // Remove edit parameter from URL
-    navigate(`/dashboard/jobs/${id}`, { replace: true });
+  const handleSave = async () => {
+    if (!editedJob || !id) return;
+
+    try {
+      setIsUpdating(true);
+
+      // Map the edited job data to API format
+      const updateData = {
+        title: editedJob.jobTitle,
+        description: editedJob.jobDescription,
+        external_description: editedJob.externalJobDescription,
+        company_name: editedJob.customer,
+        location: editedJob.state || editedJob.location,
+        city: editedJob.city,
+        state: editedJob.state,
+        country: editedJob.country,
+        job_type: editedJob.jobType,
+        salary_min: editedJob.salary_min,
+        salary_max: editedJob.salary_max,
+        salary_currency: editedJob.salary_currency,
+        experience_min: editedJob.minExperience,
+        experience_max: editedJob.maxExperience,
+        required_skills: editedJob.primarySkills || [],
+        preferred_skills: editedJob.secondarySkills || [],
+        education_requirements: editedJob.educationRequirements,
+        status: editedJob.status,
+        priority: editedJob.priority,
+        positions_available: editedJob.positionsAvailable,
+        max_submissions_allowed: editedJob.max_submissions_allowed,
+        vendor_eligible: editedJob.vendor_eligible,
+        remote_work_allowed: editedJob.remote_work_allowed,
+        start_date: editedJob.startDate,
+        end_date: editedJob.endDate,
+        application_deadline: editedJob.applicationDeadline,
+      };
+
+      const response = await jobService.updateJob(id, updateData);
+
+      if (response.success) {
+        // Update the job data with the response
+        setLocalJob(response.data.job);
+        setEditedJob(null);
+        setIsEditMode(false);
+
+        // Show success message
+        toast({
+          title: "Job Updated Successfully",
+          description: "The job has been updated with your changes.",
+        });
+
+        // Remove edit parameter from URL
+        navigate(`/dashboard/jobs/${id}`, { replace: true });
+      } else {
+        throw new Error(response.message || "Failed to update job");
+      }
+    } catch (error: any) {
+      console.error("Error updating job:", error);
+      toast({
+        title: "Error Updating Job",
+        description:
+          error.response?.data?.message ||
+          error.message ||
+          "Failed to update job",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   const handleCancel = () => {
@@ -223,7 +291,8 @@ const JobDetail = () => {
   };
 
   // Candidates will be loaded from submissions API in the future
-  const [candidates, setCandidates] = useState([]);
+  const [candidates, setCandidates] = useState<any[]>([]);
+  const [submissions, setSubmissions] = useState<any[]>([]);
 
   // Job notes will be loaded from backend in the future
   const [jobNotes, setJobNotes] = useState([]);
@@ -414,13 +483,101 @@ const JobDetail = () => {
     window.location.href = `tel:${phone}`;
   };
 
-  // Calculate statistics
-  const totalCandidates = candidates.length;
-  const sourcingFunnelCandidates = candidates.filter(
-    (c) => c.stage !== "offer" && c.stage !== "rejected"
-  ).length;
-  const hiredCandidates = 2; // Mock data
-  const rejectedCandidates = 168; // Mock data
+  // Fetch submission statistics from backend
+  const [submissionStats, setSubmissionStats] = useState({
+    total: 0,
+    hired: 0,
+    rejected: 0,
+    active: 0,
+  });
+
+  // Map submission status to kanban stage
+  const mapSubmissionStatusToStage = (status: string): string => {
+    const statusMap: Record<string, string> = {
+      "submitted": "submitted",
+      "under_review": "screening",
+      "shortlisted": "screening",
+      "interview_scheduled": "submitted",
+      "interviewed": "submitted",
+      "offered": "offer",
+      "hired": "offer",
+      "rejected": "sourced", // Rejected candidates stay in sourced for visibility
+    };
+    return statusMap[status] || "sourced";
+  };
+
+  useEffect(() => {
+    const fetchSubmissionStats = async () => {
+      if (!id) return;
+      
+      try {
+        // Fetch all submissions for this job using pagination
+        let allSubmissions: any[] = [];
+        let currentPage = 1;
+        let hasMore = true;
+        const limit = 100; // Backend max limit
+        
+        while (hasMore) {
+          const response = await recruiterService.getJobSubmissions(id, {
+            page: currentPage,
+            limit: limit,
+          });
+          
+          const submissions = response.data.submissions || [];
+          allSubmissions = [...allSubmissions, ...submissions];
+          
+          const pagination = response.data.pagination || {};
+          const totalPages = pagination.total_pages || pagination.totalPages || 1;
+          
+          if (currentPage >= totalPages || submissions.length < limit) {
+            hasMore = false;
+          } else {
+            currentPage++;
+          }
+        }
+        
+        // Store submissions for kanban display
+        setSubmissions(allSubmissions);
+        
+        // Map submissions to candidates format for kanban
+        const mappedCandidates = allSubmissions.map((sub: any, index: number) => ({
+          id: sub.id || `sub-${index}`,
+          name: `${sub.candidate?.first_name || ""} ${sub.candidate?.last_name || ""}`.trim() || "Unknown Candidate",
+          experience: `${sub.candidate?.years_of_experience || 0} years`,
+          location: sub.candidate?.location || sub.job?.location || "Unknown",
+          score: sub.ai_score || Math.floor(Math.random() * 100),
+          stage: mapSubmissionStatusToStage(sub.status),
+          notes: sub.notes || sub.cover_letter?.substring(0, 100),
+          submission: sub, // Keep reference to original submission
+        }));
+        setCandidates(mappedCandidates);
+        
+        const stats = {
+          total: allSubmissions.length,
+          hired: allSubmissions.filter((s: any) => s.status === "hired").length,
+          rejected: allSubmissions.filter((s: any) => s.status === "rejected").length,
+          active: allSubmissions.filter((s: any) => 
+            ["submitted", "under_review", "shortlisted", "interview_scheduled", "interviewed", "offered"].includes(s.status)
+          ).length,
+        };
+        
+        setSubmissionStats(stats);
+      } catch (error) {
+        console.error("Error fetching submission stats:", error);
+        // Keep defaults (0) on error
+      }
+    };
+
+    if (id && user?.role === "recruiter") {
+      fetchSubmissionStats();
+    }
+  }, [id, user?.role]);
+
+  // Calculate statistics from backend data
+  const totalCandidates = submissionStats.total || job?.submission_count || 0;
+  const sourcingFunnelCandidates = submissionStats.active || 0;
+  const hiredCandidates = submissionStats.hired || 0;
+  const rejectedCandidates = submissionStats.rejected || 0;
 
   // Loading state
   if (loading) {
@@ -677,7 +834,10 @@ const JobDetail = () => {
                       <div className="flex items-center gap-2 bg-blue-50 px-3 py-1 rounded-full flex-shrink-0">
                         <MapPin className="w-4 h-4 text-blue-600" />
                         <span className="font-medium text-blue-700 whitespace-nowrap">
-                          Remote
+                          {currentJob.state ||
+                            job.location ||
+                            job.city ||
+                            "Remote"}
                         </span>
                       </div>
                       <div className="flex items-center gap-2 bg-purple-50 px-3 py-1 rounded-full flex-shrink-0">
@@ -728,24 +888,20 @@ const JobDetail = () => {
                 <div className="flex items-center gap-8">
                   <div className="text-center">
                     <div className="text-2xl font-bold text-blue-600">
-                      $75/hr
+                      {job.salary_min && job.salary_max
+                        ? `$${Math.round(
+                            (job.salary_min + job.salary_max) / 2 / 2080
+                          )}`
+                        : job.salary_min
+                        ? `$${Math.round(job.salary_min / 2080)}`
+                        : "N/A"}
+                      /hr
                     </div>
                     <div className="text-sm text-gray-600">
                       Estimated Pay Rate
                     </div>
                   </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-purple-600">
-                      25.5%
-                    </div>
-                    <div className="text-sm text-gray-600">Gross Margin %</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-indigo-600">
-                      18.2%
-                    </div>
-                    <div className="text-sm text-gray-600">Net Margin %</div>
-                  </div>
+                  {/* Removed static margin percentages - these should come from backend if needed */}
                 </div>
               )}
             </div>

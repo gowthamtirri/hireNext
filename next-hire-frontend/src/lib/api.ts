@@ -100,10 +100,12 @@ export interface PaginatedResponse<T> {
     submissions?: T[];
     tasks?: T[];
     pagination: {
-      current_page: number;
-      total_pages: number;
-      total_items: number;
-      items_per_page: number;
+      currentPage: number;
+      totalPages: number;
+      totalItems: number;
+      itemsPerPage: number;
+      hasNextPage: boolean;
+      hasPrevPage: boolean;
     };
   };
 }

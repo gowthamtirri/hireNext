@@ -4,9 +4,10 @@ import { Loader2 } from "lucide-react";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
+  allowedRoles?: string[];
 }
 
-export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
+export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles }) => {
   const { isAuthenticated, isLoading, user } = useAuth();
 
   console.log(
@@ -35,6 +36,27 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   if (!isAuthenticated) {
     console.log("ProtectedRoute - Not authenticated, redirecting to login");
     return <Navigate to="/auth/login" replace />;
+  }
+
+  // Check role-based access if allowedRoles is specified
+  if (allowedRoles && allowedRoles.length > 0 && user?.role) {
+    if (!allowedRoles.includes(user.role)) {
+      console.log(`ProtectedRoute - User role ${user.role} not allowed. Allowed roles:`, allowedRoles);
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 via-white to-red-50/50">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-red-600 mb-4">Access Denied</h1>
+            <p className="text-gray-600 mb-6">You don't have permission to access this page.</p>
+            <button 
+              onClick={() => window.history.back()}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+            >
+              Go Back
+            </button>
+          </div>
+        </div>
+      );
+    }
   }
 
   console.log("ProtectedRoute - Authenticated, rendering children");

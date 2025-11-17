@@ -584,7 +584,7 @@ const Submissions = () => {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => navigate(`/job-detail/${submission.job?.id}`)}>
+                        <DropdownMenuItem onClick={() => navigate(`/job/${submission.job?.id}`)}>
                           <Eye className="h-4 w-4 mr-2" />
                           View Job Details
                         </DropdownMenuItem>

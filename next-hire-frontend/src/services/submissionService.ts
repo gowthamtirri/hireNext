@@ -113,7 +113,24 @@ export interface SingleSubmissionResponse {
 class SubmissionService {
   private baseUrl = "/submissions";
 
-  // Apply to job
+  // Apply to job (for candidates)
+  async applyToJob(jobId: string, data: {
+    cover_letter?: string;
+    expected_salary?: number;
+    availability_date?: string;
+  }): Promise<SingleSubmissionResponse> {
+    try {
+      console.log(`Applying to job ${jobId} with data:`, data);
+      const response = await apiClient.post(`/candidate/jobs/${jobId}/apply`, data);
+      console.log("Application API response:", response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error("Application API error:", error);
+      throw error;
+    }
+  }
+
+  // Create submission (general)
   async createSubmission(data: CreateSubmissionRequest): Promise<SingleSubmissionResponse> {
     const response = await apiClient.post(this.baseUrl, data);
     return response.data;
@@ -129,7 +146,7 @@ class SubmissionService {
       }
     });
 
-    const response = await apiClient.get(`${this.baseUrl}/candidate/my-applications?${params.toString()}`);
+    const response = await apiClient.get(`/candidate/submissions?${params.toString()}`);
     return response.data;
   }
 

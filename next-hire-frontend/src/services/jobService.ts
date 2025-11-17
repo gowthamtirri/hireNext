@@ -166,7 +166,7 @@ class JobService {
       }
     });
 
-    const response = await apiClient.get(`${this.baseUrl}/recruiter/my-jobs?${params.toString()}`);
+    const response = await apiClient.get(`/recruiter/jobs?${params.toString()}`);
     return response.data;
   }
 
@@ -180,7 +180,7 @@ class JobService {
       }
     });
 
-    const response = await apiClient.get(`${this.baseUrl}/vendor/eligible?${params.toString()}`);
+    const response = await apiClient.get(`/vendor/jobs?${params.toString()}`);
     return response.data;
   }
 

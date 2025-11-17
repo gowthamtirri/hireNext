@@ -115,46 +115,91 @@ export const createJob = asyncHandler(
       end_date,
       application_deadline,
       assigned_to,
+      status, // Allow status to be set from frontend
     } = req.body;
 
-    const job = await Job.create({
-      title,
-      description,
-      external_description,
-      company_name,
-      location,
-      city,
-      state,
-      country: country || "US",
-      job_type,
-      salary_min,
-      salary_max,
-      salary_currency: salary_currency || "USD",
-      experience_min,
-      experience_max,
-      required_skills: required_skills || [],
-      preferred_skills: preferred_skills || [],
-      education_requirements,
-      priority: priority || "medium",
-      positions_available: positions_available || 1,
-      max_submissions_allowed,
-      vendor_eligible: vendor_eligible !== false, // Default to true
-      remote_work_allowed: remote_work_allowed || false,
-      start_date,
-      end_date,
-      application_deadline,
-      created_by: userId!,
-      assigned_to: assigned_to || userId,
-      status: "draft", // Jobs start as draft
-    });
+    // Generate job_id if not provided
+    let job_id: string;
+    try {
+      const year = new Date().getFullYear();
+      // Find the highest job number for this year
+      const lastJob = await Job.findOne({
+        where: {
+          job_id: {
+            [Op.like]: `JOB-${year}-%`,
+          },
+        },
+        order: [["created_at", "DESC"]],
+        attributes: ["job_id"],
+      });
 
-    logger.info(`Job created: ${job.job_id} by user ${userId}`);
+      let jobNumber = 1;
+      if (lastJob && lastJob.job_id) {
+        const parts = lastJob.job_id.split("-");
+        if (parts.length >= 3) {
+          const lastJobNumber = parseInt(parts[2] || "0");
+          if (!isNaN(lastJobNumber)) {
+            jobNumber = lastJobNumber + 1;
+          }
+        }
+      }
 
-    res.status(201).json({
-      success: true,
-      message: "Job created successfully",
-      data: job,
-    });
+      // Format: JOB-YYYY-XXX (e.g., JOB-2024-001)
+      job_id = `JOB-${year}-${String(jobNumber).padStart(3, "0")}`;
+    } catch (error: any) {
+      logger.error(`Error generating job_id: ${error.message}`);
+      // Fallback: use timestamp-based ID
+      const year = new Date().getFullYear();
+      const timestamp = Date.now().toString().slice(-6);
+      job_id = `JOB-${year}-${timestamp}`;
+    }
+
+    try {
+      logger.info(`Creating job with job_id: ${job_id} for user ${userId}`);
+      
+      const job = await Job.create({
+        job_id, // Set the generated job_id
+        title,
+        description,
+        external_description,
+        company_name,
+        location,
+        city,
+        state,
+        country: country || "US",
+        job_type,
+        salary_min,
+        salary_max,
+        salary_currency: salary_currency || "USD",
+        experience_min,
+        experience_max,
+        required_skills: required_skills || [],
+        preferred_skills: preferred_skills || [],
+        education_requirements,
+        priority: priority || "medium",
+        positions_available: positions_available || 1,
+        max_submissions_allowed,
+        vendor_eligible: vendor_eligible !== false, // Default to true
+        remote_work_allowed: remote_work_allowed || false,
+        start_date,
+        end_date,
+        application_deadline,
+        created_by: userId!,
+        assigned_to: assigned_to || userId,
+        status: status || "active", // Use provided status or default to active
+      });
+
+      logger.info(`Job created successfully: ${job.job_id} by user ${userId}`);
+
+      res.status(201).json({
+        success: true,
+        message: "Job created successfully",
+        data: job,
+      });
+    } catch (error: any) {
+      logger.error(`Error creating job: ${error.message}`, error);
+      throw error; // Let asyncHandler handle it
+    }
   }
 );
 

@@ -52,6 +52,7 @@ import MyRelationships from "./pages/MyRelationships";
 import SignupCandidate from "./pages/SignupCandidate";
 import SignupVendor from "./pages/SignupVendor";
 import JobDetailNew from "./pages/JobDetailNew";
+import JobApplication from "./pages/JobApplication";
 
 const queryClient = new QueryClient();
 
@@ -82,6 +83,11 @@ const App = () => (
             {/* Public Job Routes */}
             <Route path="/jobs" element={<JobSearch />} />
             <Route path="/job/:id" element={<JobDetailNew />} />
+            <Route path="/job/:id/apply" element={
+              <ProtectedRoute>
+                <JobApplication />
+              </ProtectedRoute>
+            } />
 
             {/* Redirect root to login */}
             <Route path="/" element={<Navigate to="/auth/login" replace />} />

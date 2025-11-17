@@ -26,7 +26,10 @@ export const useInterviews = (initialFilters: InterviewFilters = {}) => {
   const { user } = useAuth();
 
   const fetchInterviews = useCallback(async (searchFilters: InterviewFilters = {}) => {
-    if (!user || !["recruiter", "candidate"].includes(user.role)) return;
+    if (!user || !["recruiter", "candidate"].includes(user.role)) {
+      setInterviews([]);
+      return;
+    }
 
     try {
       setLoading(true);
@@ -35,12 +38,21 @@ export const useInterviews = (initialFilters: InterviewFilters = {}) => {
       const finalFilters = { ...filters, ...searchFilters };
       const response = await interviewService.getInterviews(finalFilters);
 
-      setInterviews(response.data.interviews);
-      setPagination(response.data.pagination);
+      setInterviews(response.data?.interviews || []);
+      setPagination(response.data?.pagination || {
+        currentPage: 1,
+        totalPages: 1,
+        totalItems: 0,
+        itemsPerPage: 20,
+        hasNextPage: false,
+        hasPrevPage: false,
+      });
       setFilters(finalFilters);
     } catch (err: any) {
       const errorMessage = err.response?.data?.message || err.message || "Failed to fetch interviews";
       setError(errorMessage);
+      setInterviews([]); // Set empty array on error
+      console.error('Error fetching interviews:', err);
       toast.error(errorMessage);
     } finally {
       setLoading(false);
@@ -60,9 +72,12 @@ export const useInterviews = (initialFilters: InterviewFilters = {}) => {
   // Load initial data
   useEffect(() => {
     if (user && ["recruiter", "candidate"].includes(user.role)) {
-      fetchInterviews();
+      fetchInterviews({});
+    } else {
+      setInterviews([]);
+      setLoading(false);
     }
-  }, [user]);
+  }, [user?.role]); // Only depend on role, not entire user object
 
   return {
     interviews,

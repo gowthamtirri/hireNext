@@ -1,6 +1,6 @@
 import { Response } from "express";
-import { Op } from "sequelize";
-import { Placement, Job, Candidate, Submission, User, Recruiter } from "../models";
+import { Op, Sequelize } from "sequelize";
+import { Placement, Job, Candidate, Submission, User, Recruiter, sequelize } from "../models";
 import { logger } from "../utils/logger";
 import { AuthenticatedRequest } from "../middleware/auth";
 
@@ -586,6 +586,12 @@ export const getPlacementStats = async (req: AuthenticatedRequest, res: Response
 
     const whereConditions: any = { recruiter_id: userId };
 
+    // Check database dialect for date formatting
+    const isSQLite = sequelize.getDialect() === "sqlite";
+    const dateFormatFn = isSQLite
+      ? Sequelize.fn("strftime", "%Y-%m", Sequelize.col("created_at"))
+      : Sequelize.fn("DATE_FORMAT", Sequelize.col("created_at"), "%Y-%m");
+
     const [
       totalPlacements,
       activePlacements,
@@ -603,7 +609,7 @@ export const getPlacementStats = async (req: AuthenticatedRequest, res: Response
         where: whereConditions,
         attributes: [
           "status",
-          [require("sequelize").fn("COUNT", "*"), "count"],
+          [Sequelize.literal("COUNT(*)"), "count"],
         ],
         group: ["status"],
         raw: true,
@@ -612,7 +618,7 @@ export const getPlacementStats = async (req: AuthenticatedRequest, res: Response
         where: whereConditions,
         attributes: [
           "placement_type",
-          [require("sequelize").fn("COUNT", "*"), "count"],
+          [Sequelize.literal("COUNT(*)"), "count"],
         ],
         group: ["placement_type"],
         raw: true,
@@ -625,10 +631,10 @@ export const getPlacementStats = async (req: AuthenticatedRequest, res: Response
           },
         },
         attributes: [
-          [require("sequelize").fn("DATE_FORMAT", require("sequelize").col("created_at"), "%Y-%m"), "month"],
-          [require("sequelize").fn("COUNT", "*"), "count"],
+          [dateFormatFn, "month"],
+          [Sequelize.literal("COUNT(*)"), "count"],
         ],
-        group: [require("sequelize").fn("DATE_FORMAT", require("sequelize").col("created_at"), "%Y-%m")],
+        group: [dateFormatFn],
         raw: true,
       }),
     ]);

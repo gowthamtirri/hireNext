@@ -71,23 +71,46 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useSubmissions } from "@/hooks/useSubmissions";
+import { useRecruiterSubmissions } from "@/hooks/useRecruiterSubmissions";
 import { useAuth } from "@/contexts/AuthContext";
 import { submissionService } from "@/services/submissionService";
+import { recruiterService } from "@/services/recruiterService";
 import { toast } from "sonner";
 
 const Submissions = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { 
-    submissions, 
-    loading, 
-    error, 
-    pagination, 
-    filters, 
-    fetchSubmissions, 
-    refresh,
-    setFilters 
-  } = useSubmissions();
+  
+  // Use different hooks based on user role
+  const candidateVendorSubmissions = useSubmissions();
+  const recruiterSubmissions = useRecruiterSubmissions();
+  
+  // Select the appropriate hook data based on role
+  const submissionsData = user?.role === "recruiter" 
+    ? recruiterSubmissions 
+    : candidateVendorSubmissions;
+  
+  // Get the appropriate data based on role
+  const submissions = submissionsData.submissions || [];
+  const loading = submissionsData.loading || false;
+  const error = submissionsData.error || null;
+  const pagination = submissionsData.pagination || {
+    currentPage: 1,
+    totalPages: 1,
+    totalItems: 0,
+    itemsPerPage: 10,
+    hasNextPage: false,
+    hasPrevPage: false,
+  };
+  const filters = submissionsData.filters || {};
+  const refresh = submissionsData.refresh || (() => {});
+  const setFilters = submissionsData.setFilters || (() => {});
+  const updateStatus = (submissionsData as any).updateSubmissionStatus;
+  
+  // Handle different method names
+  const fetchSubmissions = (submissionsData as any).searchSubmissions || 
+                          (submissionsData as any).fetchSubmissions || 
+                          (() => {});
 
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -138,24 +161,53 @@ const Submissions = () => {
   const handleStatusUpdate = async () => {
     if (!selectedSubmission || !newStatus) return;
 
-    const success = await updateSubmissionStatus(selectedSubmission.id, newStatus);
-    if (success) {
-      setShowStatusDialog(false);
-      setSelectedSubmission(null);
-      setNewStatus("");
-      refresh();
+    try {
+      if (user?.role === "recruiter" && updateStatus) {
+        // Recruiter uses recruiterService
+        const result = await updateStatus(selectedSubmission.id, { 
+          status: newStatus as any,
+          notes: newNote || undefined
+        });
+        if (result) {
+          setShowStatusDialog(false);
+          setSelectedSubmission(null);
+          setNewStatus("");
+          setNewNote("");
+        }
+      } else if (user?.role === "recruiter") {
+        // Fallback for recruiters
+        const response = await recruiterService.updateSubmissionStatus(selectedSubmission.id, {
+          status: newStatus as any,
+          notes: newNote || undefined
+        });
+        if (response.success) {
+          setShowStatusDialog(false);
+          setSelectedSubmission(null);
+          setNewStatus("");
+          setNewNote("");
+          refresh();
+        }
+      } else {
+        // Candidate/Vendor - they can't update status, only withdraw
+        toast.error("Only recruiters can update submission status");
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Failed to update submission status");
     }
   };
 
   const handleAddNote = async () => {
     if (!selectedSubmission || !newNote.trim()) return;
 
-    const success = await addSubmissionNote(selectedSubmission.id, newNote);
-    if (success) {
-      setShowNoteDialog(false);
-      setSelectedSubmission(null);
-      setNewNote("");
-      refresh();
+    try {
+      if (user?.role === "recruiter") {
+        // For recruiters, notes are added when updating status
+        await handleStatusUpdate();
+      } else {
+        toast.error("Only recruiters can add notes to submissions");
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Failed to add note");
     }
   };
 
@@ -593,7 +645,7 @@ const Submissions = () => {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => navigate(`/job-detail/${submission.job?.id}`)}>
+                        <DropdownMenuItem onClick={() => navigate(`/job/${submission.job?.id}`)}>
                           <Eye className="h-4 w-4 mr-2" />
                           View Job Details
                         </DropdownMenuItem>

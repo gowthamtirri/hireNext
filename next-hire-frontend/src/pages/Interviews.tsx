@@ -169,30 +169,6 @@ const Interviews = () => {
       }
     }
   };
-
-  // Group interviews by job
-  const interviewsByJob = interviews.reduce((acc, interview) => {
-    const jobKey = interview.submission?.job?.job_id || 'unknown';
-    if (!acc[jobKey]) {
-      acc[jobKey] = {
-        jobId: interview.submission?.job?.job_id || 'Unknown',
-        jobTitle: interview.submission?.job?.title || 'Unknown Position',
-        company: interview.submission?.job?.company_name || 'Unknown Company',
-        interviews: []
-      };
-    }
-    acc[jobKey].interviews.push(interview);
-    return acc;
-  }, {} as Record<string, any>);
-
-  // Calculate statistics
-  const totalInterviews = interviews.length;
-  const scheduledInterviews = interviews.filter(i => i.status === "scheduled").length;
-  const completedInterviews = interviews.filter(i => i.status === "completed").length;
-  const upcomingInterviews = interviews.filter(i => 
-    i.status === "scheduled" && interviewService.isUpcoming(i.scheduled_at)
-  ).length;
-  const totalJobs = Object.keys(interviewsByJob).length;
   
   // Todo state
   const [todos, setTodos] = useState([
@@ -210,6 +186,17 @@ const Interviews = () => {
   const [todoSort, setTodoSort] = useState("dueDate");
   const [rescheduleData, setRescheduleData] = useState<{todoId: number | null, newDate: Date | undefined}>({todoId: null, newDate: undefined});
   const [reassignData, setReassignData] = useState<{todoId: number | null, newAssignee: string}>({todoId: null, newAssignee: ""});
+
+  // Mock users data for todo assignees (in production, fetch from API)
+  const usersData = {
+    users: [
+      { id: "1", name: user?.name || "Current User" },
+      { id: "2", name: "Sarah Johnson" },
+      { id: "3", name: "Mike Chen" },
+      { id: "4", name: "Emily Davis" },
+      { id: "5", name: "Alex Wilson" },
+    ]
+  };
 
   // Todo functions
   const handleAddTodo = () => {
@@ -314,7 +301,38 @@ const Interviews = () => {
     return "text-red-600";
   };
 
+  // Calculate statistics FIRST (before navigationCards uses them)
+  const safeInterviews = interviews || [];
+  
+  // Group interviews by job (safe calculation)
+  const interviewsByJob = safeInterviews.reduce((acc, interview) => {
+    try {
+      const jobKey = interview?.submission?.job?.job_id || interview?.job_id || 'unknown';
+      if (!acc[jobKey]) {
+        acc[jobKey] = {
+          jobId: interview?.submission?.job?.job_id || interview?.job_id || 'Unknown',
+          jobTitle: interview?.submission?.job?.title || interview?.job_title || 'Unknown Position',
+          company: interview?.submission?.job?.company_name || interview?.company_name || 'Unknown Company',
+          interviews: []
+        };
+      }
+      acc[jobKey].interviews.push(interview);
+    } catch (err) {
+      console.error('Error processing interview:', err, interview);
+    }
+    return acc;
+  }, {} as Record<string, any>);
 
+  // Calculate statistics (safe calculation)
+  const totalInterviews = safeInterviews.length;
+  const scheduledInterviews = safeInterviews.filter(i => i?.status === "scheduled").length;
+  const completedInterviews = safeInterviews.filter(i => i?.status === "completed").length;
+  const upcomingInterviews = safeInterviews.filter(i => 
+    i?.status === "scheduled" && interviewService.isUpcoming(i.scheduled_at)
+  ).length;
+  const totalJobs = Object.keys(interviewsByJob).length;
+
+  // Now define navigationCards AFTER all variables are initialized
   const navigationCards = [
     {
       title: "Total Interviews",
@@ -355,6 +373,9 @@ const Interviews = () => {
       }
     },
   ];
+
+  // Don't show early returns - let the component render and show loading/error states inline
+  // This prevents blank screens if there are any errors during initialization
 
   return (
     <div className="space-y-2 sm:space-y-3 md:space-y-4 px-1 sm:px-0">
@@ -472,12 +493,15 @@ const Interviews = () => {
                 </div>
                 <div>
                   <label className="text-sm font-medium text-gray-700 mb-2 block">Status</label>
-                  <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as InterviewStatus | "")}>
+                  <Select 
+                    value={statusFilter || "all"} 
+                    onValueChange={(value) => setStatusFilter(value === "all" ? "" : (value as InterviewStatus))}
+                  >
                     <SelectTrigger className="text-sm">
                       <SelectValue placeholder="All statuses" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All statuses</SelectItem>
+                      <SelectItem value="all">All statuses</SelectItem>
                       <SelectItem value="scheduled">Scheduled</SelectItem>
                       <SelectItem value="in_progress">In Progress</SelectItem>
                       <SelectItem value="completed">Completed</SelectItem>
@@ -488,12 +512,15 @@ const Interviews = () => {
                 </div>
                 <div>
                   <label className="text-sm font-medium text-gray-700 mb-2 block">Type</label>
-                  <Select value={typeFilter} onValueChange={(value) => setTypeFilter(value as InterviewType | "")}>
+                  <Select 
+                    value={typeFilter || "all"} 
+                    onValueChange={(value) => setTypeFilter(value === "all" ? "" : (value as InterviewType))}
+                  >
                     <SelectTrigger className="text-sm">
                       <SelectValue placeholder="All types" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All types</SelectItem>
+                      <SelectItem value="all">All types</SelectItem>
                       <SelectItem value="phone">Phone</SelectItem>
                       <SelectItem value="video">Video</SelectItem>
                       <SelectItem value="in_person">In Person</SelectItem>
@@ -540,7 +567,7 @@ const Interviews = () => {
           )}
 
           {/* Empty State */}
-          {!interviewsLoading && !interviewsError && interviews.length === 0 && (
+          {!interviewsLoading && !interviewsError && safeInterviews.length === 0 && (
             <Card className="border-gray-200 shadow-sm bg-white/95 backdrop-blur-sm">
               <CardContent className="p-8 text-center">
                 <Users className="w-12 h-12 mx-auto mb-4 text-gray-400" />
@@ -560,7 +587,7 @@ const Interviews = () => {
           )}
 
           {/* Interviews List */}
-          {!interviewsLoading && !interviewsError && interviews.length > 0 && (
+          {!interviewsLoading && !interviewsError && safeInterviews.length > 0 && (
           <Card className="border-gray-200 shadow-sm overflow-hidden bg-white/95 backdrop-blur-sm">
             <CardContent className="p-0 relative">
               <div className="space-y-0 relative">
@@ -761,7 +788,7 @@ const Interviews = () => {
           )}
 
           {/* Pagination */}
-          {!interviewsLoading && !interviewsError && interviews.length > 0 && pagination.totalPages > 1 && (
+          {!interviewsLoading && !interviewsError && safeInterviews.length > 0 && pagination.totalPages > 1 && (
             <Card className="border-gray-200 shadow-sm bg-white/95 backdrop-blur-sm">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">

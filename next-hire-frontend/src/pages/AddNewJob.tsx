@@ -31,7 +31,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { useToast } from "@/hooks/use-toast";
-import { jobService } from "@/services/jobService";
+import { recruiterService } from "@/services/recruiterService";
 import { useAuth } from "@/contexts/AuthContext";
 
 const AddNewJob = () => {
@@ -70,7 +70,17 @@ const AddNewJob = () => {
       remoteWorkAllowed: false,
       startDate: "",
       endDate: "",
-      applicationDeadline: ""
+      applicationDeadline: "",
+      clientContact: "",
+      clientJobId: "",
+      jobStartDate: "",
+      jobEndDate: "",
+      numberOfPositions: "1",
+      taxTerms: "",
+      paymentTerms: "",
+      expensePaid: false,
+      spokenLanguages: "",
+      documentsRequired: ""
     }
   });
 
@@ -132,6 +142,16 @@ const AddNewJob = () => {
   };
 
   const handleSubmit = async (data: any) => {
+    // Ensure we're on the final step before submitting
+    if (currentStep !== 4) {
+      toast({
+        title: "Please Complete All Steps",
+        description: "Please complete all steps before submitting.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!user) {
       toast({
         title: "Error",
@@ -146,74 +166,311 @@ const AddNewJob = () => {
     try {
       // Validate required fields
       if (!data.jobTitle?.trim()) {
-        throw new Error("Job title is required");
+        toast({
+          title: "Validation Error",
+          description: "Job title is required",
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
       }
+      
       if (!data.jobDescription?.trim()) {
-        throw new Error("Job description is required");
+        toast({
+          title: "Validation Error",
+          description: "Job description is required",
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
       }
+      
       if (!data.customer?.trim()) {
-        throw new Error("Company name is required");
+        toast({
+          title: "Validation Error",
+          description: "Company name is required",
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
       }
 
-      // Map form data to API format
-      const jobData = {
+      // Validate location (backend requires it)
+      if (!data.location?.trim()) {
+        toast({
+          title: "Validation Error",
+          description: "Location is required",
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Validate job type (backend requires it)
+      const mappedJobType = mapJobTypeToAPI(data.jobType);
+      if (!mappedJobType || !["full_time", "part_time", "contract", "temporary"].includes(mappedJobType)) {
+        toast({
+          title: "Validation Error",
+          description: "Please select a valid job type",
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Map form data to API format - start with required fields
+      const jobData: any = {
         title: data.jobTitle.trim(),
-        description: data.jobDescription.trim(),
-        external_description: data.externalJobDescription?.trim(),
+        description: (data.jobDescription || "").trim(), // Ensure it's a string
         company_name: data.customer.trim(),
-        location: data.location?.trim() || "Remote", // Provide default if missing
-        city: data.city?.trim(),
-        state: data.state?.trim(),
-        country: data.country?.trim(),
-        job_type: mapJobTypeToAPI(data.jobType) || "full_time", // Ensure valid job type
-        salary_min: data.salaryMin ? parseFloat(data.salaryMin) : undefined,
-        salary_max: data.salaryMax ? parseFloat(data.salaryMax) : undefined,
-        salary_currency: data.salaryCurrency || "USD",
-        experience_min: data.experienceMin ? parseInt(data.experienceMin) : undefined,
-        experience_max: data.experienceMax ? parseInt(data.experienceMax) : undefined,
-        required_skills: skills.length > 0 ? skills : [],
-        preferred_skills: secondarySkills.length > 0 ? secondarySkills : [],
-        education_requirements: data.educationRequirements?.trim(),
-        status: mapStatusToAPI(data.jobStatus) || "draft",
-        priority: mapPriorityToAPI(data.priority) || "medium",
-        positions_available: data.positionsAvailable ? parseInt(data.positionsAvailable) : 1,
-        vendor_eligible: Boolean(data.vendorEligible),
-        remote_work_allowed: Boolean(data.remoteWorkAllowed),
-        start_date: data.startDate ? new Date(data.startDate).toISOString() : undefined,
-        end_date: data.endDate ? new Date(data.endDate).toISOString() : undefined,
-        application_deadline: data.applicationDeadline ? new Date(data.applicationDeadline).toISOString() : undefined,
+        location: data.location.trim(), // Required field
+        job_type: mappedJobType, // Required field, already validated
+        country: (data.country?.trim() || "US"), // Always send country
+        salary_currency: (data.salaryCurrency || "USD"), // Always send currency
       };
-
-      // Additional validation
-      if (!["full_time", "part_time", "contract", "temporary"].includes(jobData.job_type)) {
-        jobData.job_type = "full_time"; // Default to full_time if invalid
-      }
-      if (!["low", "medium", "high"].includes(jobData.priority)) {
-        jobData.priority = "medium"; // Default to medium if invalid
-      }
-      if (!["draft", "active", "paused", "closed"].includes(jobData.status)) {
-        jobData.status = "draft"; // Default to draft if invalid
-      }
-
-      console.log('Creating new job:', jobData);
       
-      const response = await jobService.createJob(jobData);
+      // Ensure description is not empty (backend requires it)
+      if (!jobData.description) {
+        toast({
+          title: "Validation Error",
+          description: "Job description is required",
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Status - map from form to API format (default to active)
+      const mappedStatus = mapStatusToAPI(data.jobStatus);
+      if (mappedStatus && ["draft", "active", "paused", "closed"].includes(mappedStatus)) {
+        jobData.status = mappedStatus;
+      } else {
+        // Default to active if not specified or invalid
+        jobData.status = "active";
+      }
+
+      // Optional fields - only add if they have values
+      if (data.externalJobDescription?.trim()) {
+        jobData.external_description = data.externalJobDescription.trim();
+      }
       
-      if (response.success) {
+      if (data.city?.trim()) {
+        jobData.city = data.city.trim();
+      }
+      
+      if (data.state?.trim()) {
+        jobData.state = data.state.trim();
+      }
+
+      // Salary fields
+      // Note: salary_currency is already set in initial jobData object above
+      
+      if (data.salaryMin && data.salaryMin.toString().trim() !== "") {
+        const salaryMin = parseFloat(data.salaryMin);
+        if (!isNaN(salaryMin) && salaryMin >= 0) {
+          jobData.salary_min = salaryMin;
+        }
+      }
+      
+      if (data.salaryMax && data.salaryMax.toString().trim() !== "") {
+        const salaryMax = parseFloat(data.salaryMax);
+        if (!isNaN(salaryMax) && salaryMax >= 0) {
+          jobData.salary_max = salaryMax;
+        }
+      }
+
+      // Experience fields
+      if (data.experienceMin && data.experienceMin.toString().trim() !== "") {
+        const expMin = parseInt(data.experienceMin.toString());
+        if (!isNaN(expMin) && expMin >= 0) {
+          jobData.experience_min = expMin;
+        }
+      }
+      
+      if (data.experienceMax && data.experienceMax.toString().trim() !== "") {
+        const expMax = parseInt(data.experienceMax.toString());
+        if (!isNaN(expMax) && expMax >= 0) {
+          jobData.experience_max = expMax;
+        }
+      }
+
+      // Skills
+      if (skills.length > 0) {
+        jobData.required_skills = skills;
+      }
+      
+      if (secondarySkills.length > 0) {
+        jobData.preferred_skills = secondarySkills;
+      }
+
+      // Other optional fields
+      if (data.educationRequirements?.trim()) {
+        jobData.education_requirements = data.educationRequirements.trim();
+      }
+
+      // Priority (optional, defaults to medium in backend)
+      const mappedPriority = mapPriorityToAPI(data.priority);
+      if (mappedPriority && ["low", "medium", "high"].includes(mappedPriority)) {
+        jobData.priority = mappedPriority;
+      }
+
+      // Positions available - check both numberOfPositions and positionsAvailable
+      const positionsValue = data.numberOfPositions || data.positionsAvailable;
+      if (positionsValue && positionsValue.toString().trim() !== "") {
+        const positions = parseInt(positionsValue.toString());
+        if (!isNaN(positions) && positions >= 1) {
+          jobData.positions_available = positions;
+        }
+      } else {
+        // Default to 1 if not provided
+        jobData.positions_available = 1;
+      }
+
+      if (data.maxSubmissionsAllowed && data.maxSubmissionsAllowed.toString().trim() !== "") {
+        const maxSubs = parseInt(data.maxSubmissionsAllowed.toString());
+        if (!isNaN(maxSubs) && maxSubs >= 1) {
+          jobData.max_submissions_allowed = maxSubs;
+        }
+      }
+
+      // Terms fields - store in external_description or as custom fields
+      let termsInfo = "";
+      if (data.taxTerms?.trim()) {
+        termsInfo += `Tax Terms: ${data.taxTerms.trim()}\n`;
+      }
+      if (data.paymentTerms?.trim()) {
+        termsInfo += `Payment Terms: ${data.paymentTerms.trim()}\n`;
+      }
+      if (data.expensePaid !== undefined) {
+        termsInfo += `Expenses Paid: ${data.expensePaid ? "Yes" : "No"}\n`;
+      }
+      if (data.spokenLanguages?.trim()) {
+        termsInfo += `Spoken Languages: ${data.spokenLanguages.trim()}\n`;
+      }
+      if (data.documentsRequired?.trim()) {
+        termsInfo += `Required Documents: ${data.documentsRequired.trim()}\n`;
+      }
+      
+      if (termsInfo) {
+        if (jobData.external_description) {
+          jobData.external_description = `${jobData.external_description}\n\n${termsInfo}`;
+        } else {
+          jobData.external_description = termsInfo.trim();
+        }
+      }
+
+      // Boolean fields
+      jobData.vendor_eligible = Boolean(data.vendorEligible);
+      jobData.remote_work_allowed = Boolean(data.remoteWorkAllowed);
+
+      // Date fields - check both field names (jobStartDate/jobEndDate from form, startDate/endDate for compatibility)
+      const startDateValue = data.jobStartDate || data.startDate;
+      const endDateValue = data.jobEndDate || data.endDate;
+      
+      if (startDateValue) {
+        try {
+          jobData.start_date = new Date(startDateValue).toISOString();
+        } catch (e) {
+          console.warn("Invalid start date:", startDateValue);
+        }
+      }
+      
+      if (endDateValue) {
+        try {
+          jobData.end_date = new Date(endDateValue).toISOString();
+        } catch (e) {
+          console.warn("Invalid end date:", endDateValue);
+        }
+      }
+      
+      if (data.applicationDeadline) {
+        try {
+          jobData.application_deadline = new Date(data.applicationDeadline).toISOString();
+        } catch (e) {
+          console.warn("Invalid application deadline:", data.applicationDeadline);
+        }
+      }
+
+      // Client fields - append to external_description to preserve the data
+      // These can be extracted later if backend adds dedicated fields
+      let clientInfo = "";
+      if (data.clientContact?.trim()) {
+        clientInfo += `Client Contact: ${data.clientContact.trim()}\n`;
+      }
+      if (data.clientJobId?.trim()) {
+        clientInfo += `Client Job ID: ${data.clientJobId.trim()}\n`;
+      }
+      
+      if (clientInfo) {
+        if (jobData.external_description) {
+          jobData.external_description = `${jobData.external_description}\n\n${clientInfo}`;
+        } else {
+          jobData.external_description = clientInfo.trim();
+        }
+      }
+
+      // Log all form data for debugging
+      console.log('=== FORM DATA DEBUG ===');
+      console.log('Raw form data:', data);
+      console.log('Skills:', { required: skills, preferred: secondarySkills });
+      console.log('Processed job data:', JSON.stringify(jobData, null, 2));
+      console.log('=== END DEBUG ===');
+      
+      const response = await recruiterService.createJob(jobData);
+      console.log('Job creation response:', response);
+      
+      // Handle response structure - backend returns { success: true, data: job, message: "..." }
+      if (response.success || response.data) {
         toast({
           title: "Job Created Successfully!",
           description: `Job "${jobData.title}" has been created and saved.`,
         });
 
+        // Small delay to show success message
+        setTimeout(() => {
         navigate("/dashboard/jobs");
+        }, 1000);
       } else {
         throw new Error(response.message || "Failed to create job");
       }
     } catch (error: any) {
       console.error('Error creating job:', error);
+      console.error('Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+      });
+      
+      // Better error handling for validation errors
+      let errorMessage = "An unexpected error occurred";
+      
+      if (error.response?.data) {
+        const errorData = error.response.data;
+        
+        // Handle validation errors array
+        if (errorData.errors && Array.isArray(errorData.errors) && errorData.errors.length > 0) {
+          const firstError = errorData.errors[0];
+          errorMessage = firstError.message || firstError.msg || "Validation error";
+        } 
+        // Handle single error message (validation middleware joins all errors with ", ")
+        else if (errorData.message) {
+          errorMessage = errorData.message;
+          // If multiple errors are joined, show first one for cleaner UI
+          if (errorMessage.includes(", ")) {
+            errorMessage = errorMessage.split(", ")[0];
+          }
+        }
+        // Handle error string
+        else if (typeof errorData === 'string') {
+          errorMessage = errorData;
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: "Error Creating Job",
-        description: error.response?.data?.message || error.message || "An unexpected error occurred",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -271,7 +528,7 @@ const AddNewJob = () => {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-gray-700 font-medium">Job Type *</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger className="border-gray-200 focus:border-green-400">
                           <SelectValue placeholder="Select type" />
@@ -295,7 +552,7 @@ const AddNewJob = () => {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-gray-700 font-medium">Priority *</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger className="border-gray-200 focus:border-green-400">
                           <SelectValue placeholder="Select priority" />
@@ -362,7 +619,7 @@ const AddNewJob = () => {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-gray-700 font-medium">Country</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger className="border-gray-200 focus:border-green-400">
                           <SelectValue placeholder="Select country" />
@@ -718,7 +975,7 @@ const AddNewJob = () => {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-gray-700 font-medium">Tax Terms</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger className="border-gray-200 focus:border-green-400">
                           <SelectValue placeholder="Select tax terms" />
@@ -741,7 +998,7 @@ const AddNewJob = () => {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-gray-700 font-medium">Payment Terms</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger className="border-gray-200 focus:border-green-400">
                           <SelectValue placeholder="Select payment terms" />
@@ -860,7 +1117,19 @@ const AddNewJob = () => {
 
       {/* Form Content */}
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(handleSubmit)}>
+        <form onSubmit={(e) => {
+          e.preventDefault();
+          // Only allow submission on step 4
+          if (currentStep === 4) {
+            form.handleSubmit(handleSubmit)(e);
+          } else {
+            toast({
+              title: "Please Complete All Steps",
+              description: "Please complete all steps before submitting.",
+              variant: "destructive",
+            });
+          }
+        }}>
           <Card className="backdrop-blur-xl bg-white/30 border border-white/20 shadow-md">
             <CardHeader className="border-b border-white/20 pb-4">
               <CardTitle className="text-lg font-bold font-roboto-slab text-gray-800">

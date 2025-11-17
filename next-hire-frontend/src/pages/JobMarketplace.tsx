@@ -110,7 +110,13 @@ export default function JobMarketplace() {
   };
 
   const handleApplyToJob = (jobId: string) => {
-    navigate(`/job-detail/${jobId}`);
+    if (!user || user.role !== "candidate") {
+      toast.error("Please login as a candidate to apply for jobs");
+      navigate("/auth/login");
+      return;
+    }
+    // Navigate to the job application page
+    navigate(`/job/${jobId}/apply`);
   };
 
   const handleSaveJob = (jobId: string) => {
@@ -168,7 +174,7 @@ export default function JobMarketplace() {
           <p className="text-gray-600">Discover your next career opportunity</p>
         </div>
         <div className="flex items-center space-x-2">
-          <Button variant="outline" onClick={() => navigate("/my-jobs")}>
+          <Button variant="outline" onClick={() => navigate("/dashboard/my-submissions")}>
             <FileUser className="h-4 w-4 mr-2" />
             My Applications
           </Button>
@@ -396,7 +402,7 @@ export default function JobMarketplace() {
                         </div>
                         <div>
                           <h3 className="text-lg font-semibold text-gray-900 hover:text-blue-600 cursor-pointer"
-                              onClick={() => navigate(`/job-detail/${job.id}`)}>
+                              onClick={() => navigate(`/job/${job.id}`)}>
                             {job.title}
                           </h3>
                           <p className="text-sm text-gray-600">{job.company_name}</p>

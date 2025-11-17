@@ -278,6 +278,34 @@ Job.init(
     sequelize,
     modelName: "Job",
     tableName: "jobs",
+    hooks: {
+      beforeCreate: async (job: Job) => {
+        // Generate job_id if not provided
+        if (!job.job_id) {
+          const year = new Date().getFullYear();
+          // Find the highest job number for this year
+          const lastJob = await Job.findOne({
+            where: {
+              job_id: {
+                [Op.like]: `JOB-${year}-%`,
+              },
+            },
+            order: [["created_at", "DESC"]],
+          });
+
+          let jobNumber = 1;
+          if (lastJob) {
+            const lastJobNumber = parseInt(
+              lastJob.job_id.split("-")[2] || "0"
+            );
+            jobNumber = lastJobNumber + 1;
+          }
+
+          // Format: JOB-YYYY-XXX (e.g., JOB-2024-001)
+          job.job_id = `JOB-${year}-${String(jobNumber).padStart(3, "0")}`;
+        }
+      },
+    },
     indexes: [
       {
         unique: true,

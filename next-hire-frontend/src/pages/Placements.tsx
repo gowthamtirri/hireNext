@@ -171,10 +171,41 @@ const Placements = () => {
   };
 
   // Calculate stats from real data
-  const activePlacements = stats?.activePlacements || 0;
-  const completedPlacements = stats?.completedPlacements || 0;
-  const totalPlacements = stats?.totalPlacements || 0;
-  const terminatedPlacements = stats?.terminatedPlacements || 0;
+  const activePlacements = stats?.activePlacements || placements.filter(p => p.status === "active").length || 0;
+  const completedPlacements = stats?.completedPlacements || placements.filter(p => p.status === "completed").length || 0;
+  const totalPlacements = stats?.totalPlacements || placements.length || 0;
+  const terminatedPlacements = stats?.terminatedPlacements || placements.filter(p => p.status === "terminated").length || 0;
+
+  // Calculate financial stats from placements
+  const totalCommission = placements.reduce((sum, p) => {
+    const commission = typeof p.commission === 'string' 
+      ? parseFloat(p.commission.replace(/[^0-9.]/g, '')) || 0
+      : (p.commission || 0);
+    return sum + commission;
+  }, 0);
+
+  const salaries = placements.map(p => {
+    const salary = typeof p.salary === 'string' 
+      ? parseFloat(p.salary.replace(/[^0-9.]/g, '')) || 0
+      : (p.salary || 0);
+    return salary;
+  }).filter(s => s > 0);
+  
+  const avgSalary = salaries.length > 0 
+    ? salaries.reduce((sum, s) => sum + s, 0) / salaries.length 
+    : 0;
+
+  const margins = placements.map(p => {
+    if (typeof p.margin === 'string') {
+      const margin = parseFloat(p.margin.replace(/[^0-9.]/g, '')) || 0;
+      return margin;
+    }
+    return p.margin || 0;
+  }).filter(m => m > 0);
+  
+  const avgMargin = margins.length > 0 
+    ? Math.round(margins.reduce((sum, m) => sum + m, 0) / margins.length)
+    : 0;
 
   const handleActiveClick = () => {
     setStatusFilter("active");
@@ -186,7 +217,8 @@ const Placements = () => {
     handleApplyFilters();
   };
 
-  const navigationCards = [
+  // Different navigation cards for recruiter vs candidate
+  const recruiterCards = [
     {
       title: "Active Placements",
       value: activePlacements.toString(),
@@ -237,23 +269,68 @@ const Placements = () => {
     }
   ];
 
+  const candidateCards = [
+    {
+      title: "Active Placements",
+      value: activePlacements.toString(),
+      icon: CheckCircle,
+      color: "text-green-700",
+      gradientOverlay: "bg-gradient-to-br from-green-400/30 via-green-500/20 to-green-600/30",
+      onClick: handleActiveClick
+    },
+    {
+      title: "Completed",
+      value: completedPlacements.toString(),
+      icon: Trophy,
+      color: "text-blue-700",
+      gradientOverlay: "bg-gradient-to-br from-blue-400/30 via-blue-500/20 to-blue-600/30",
+      onClick: handleCompletedClick
+    },
+    {
+      title: "Total Placements",
+      value: totalPlacements.toString(),
+      icon: Target,
+      color: "text-orange-700",
+      gradientOverlay: "bg-gradient-to-br from-orange-400/30 via-orange-500/20 to-orange-600/30",
+      onClick: () => {}
+    }
+  ];
+
+  const navigationCards = user?.role === "recruiter" ? recruiterCards : candidateCards;
+
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Active': return 'bg-green-100 text-green-800 border-green-200';
-      case 'Completed': return 'bg-blue-100 text-blue-800 border-blue-200';
+    const normalizedStatus = status?.toLowerCase() || '';
+    switch (normalizedStatus) {
+      case 'active': return 'bg-green-100 text-green-800 border-green-200';
+      case 'completed': return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'terminated': return 'bg-red-100 text-red-800 border-red-200';
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
-  const formatSalary = (salary: string) => {
+  const formatSalary = (salary: string | number) => {
+    if (!salary) return '$0';
+    if (typeof salary === 'number') {
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(salary);
+    }
     return salary?.includes('$') ? salary : `$${salary}`;
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString();
+    if (!dateString) return 'N/A';
+    try {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch {
+      return dateString;
+    }
   };
 
-  const columns = [
+  // Base columns
+  const baseColumns = [
     {
       field: 'id',
       headerName: 'ID',
@@ -340,14 +417,6 @@ const Placements = () => {
       )
     },
     {
-      field: 'commission',
-      headerName: 'Commission',
-      width: 100,
-      renderCell: (value: string) => (
-        <span className="text-green-700 font-medium font-poppins text-xs whitespace-nowrap">{formatSalary(value)}</span>
-      )
-    },
-    {
       field: 'status',
       headerName: 'Status',
       width: 100,
@@ -361,6 +430,18 @@ const Placements = () => {
       width: 100,
       renderCell: (value: string) => (
         <span className="text-gray-700 font-poppins text-xs whitespace-nowrap">{value}</span>
+      )
+    },
+  ];
+
+  // Recruiter-only columns
+  const recruiterColumns = [
+    {
+      field: 'commission',
+      headerName: 'Commission',
+      width: 100,
+      renderCell: (value: string) => (
+        <span className="text-green-700 font-medium font-poppins text-xs whitespace-nowrap">{formatSalary(value)}</span>
       )
     },
     {
@@ -381,75 +462,84 @@ const Placements = () => {
     },
   ];
 
+  const columns = user?.role === "recruiter" 
+    ? [...baseColumns, ...recruiterColumns]
+    : baseColumns;
+
   return (
     <div className="space-y-4">
       {/* Header */}
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 font-roboto-slab">Placements</h1>
-            <p className="text-lg text-gray-600 font-roboto-slab">Track successful placements and revenue</p>
+            <h1 className="text-2xl font-bold text-gray-900 font-roboto-slab">
+              {user?.role === "candidate" ? "My Placements" : "Placements"}
+            </h1>
+            <p className="text-lg text-gray-600 font-roboto-slab">
+              {user?.role === "candidate" 
+                ? "View your successful placements" 
+                : "Track successful placements and revenue"}
+            </p>
           </div>
-          <CompanyFilter 
-            onCompanyChange={(companyId) => console.log("Selected company:", companyId)}
-          />
         </div>
-        <div className="flex items-center gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="border-green-200 hover:bg-green-50 hover:border-green-300 text-xs">
-                <Calendar className="w-3 h-3 mr-1" />
-                Export
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-white border-gray-200 z-50">
-              <DropdownMenuItem>
-                <FileText className="w-4 h-4 mr-2" />
-                Export as PDF
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <FileSpreadsheet className="w-4 h-4 mr-2" />
-                Export as Excel
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <FileSpreadsheet className="w-4 h-4 mr-2" />
-                Export to Google Sheets
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="border-blue-200 hover:bg-blue-50 hover:border-blue-300 text-xs">
-                <Settings className="w-3 h-3 mr-1" />
-                Actions
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-white border-gray-200 z-50">
-              <DropdownMenuItem>
-                <FileText className="w-4 h-4 mr-2" />
-                Generate Revenue Report
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Trophy className="w-4 h-4 mr-2" />
-                Performance Summary
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <DollarSign className="w-4 h-4 mr-2" />
-                Commission Report
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+        {user?.role === "recruiter" && (
+          <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="border-green-200 hover:bg-green-50 hover:border-green-300 text-xs">
+                  <Calendar className="w-3 h-3 mr-1" />
+                  Export
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-white border-gray-200 z-50">
+                <DropdownMenuItem>
+                  <FileText className="w-4 h-4 mr-2" />
+                  Export as PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <FileSpreadsheet className="w-4 h-4 mr-2" />
+                  Export as Excel
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <FileSpreadsheet className="w-4 h-4 mr-2" />
+                  Export to Google Sheets
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="border-blue-200 hover:bg-blue-50 hover:border-blue-300 text-xs">
+                  <Settings className="w-3 h-3 mr-1" />
+                  Actions
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-white border-gray-200 z-50">
+                <DropdownMenuItem>
+                  <FileText className="w-4 h-4 mr-2" />
+                  Generate Revenue Report
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <Trophy className="w-4 h-4 mr-2" />
+                  Performance Summary
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <DollarSign className="w-4 h-4 mr-2" />
+                  Commission Report
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
-          <Button className="button-gradient text-white shadow-lg hover:shadow-xl transition-all duration-300 text-xs">
-            <Plus className="w-3 h-3 mr-1" />
-            Record Placement
-          </Button>
-        </div>
+            <Button className="button-gradient text-white shadow-lg hover:shadow-xl transition-all duration-300 text-xs">
+              <Plus className="w-3 h-3 mr-1" />
+              Record Placement
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Navigation Cards */}
-      <div className="grid grid-cols-6 gap-2">
+      <div className={`grid gap-2 ${user?.role === "recruiter" ? "grid-cols-6" : "grid-cols-3"}`}>
         {navigationCards.map((card) => {
           const IconComponent = card.icon;
           return (
@@ -476,19 +566,74 @@ const Placements = () => {
         })}
       </div>
 
+      {/* Loading State */}
+      {loading && (
+        <Card className="border-gray-200 shadow-sm">
+          <CardContent className="p-8 text-center">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
+            <p className="text-gray-600">Loading placements...</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Error State */}
+      {error && !loading && (
+        <Card className="border-red-200 shadow-sm">
+          <CardContent className="p-8 text-center">
+            <AlertCircle className="h-8 w-8 text-red-500 mx-auto mb-4" />
+            <p className="text-red-600 mb-4">{error}</p>
+            <Button onClick={refresh} variant="outline">
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Data Table */}
-      <Card className="border-gray-200 shadow-sm overflow-hidden">
-        <CardContent className="p-0">
-          <DataGrid
-            rows={placementsData}
-            columns={columns}
-            pageSizeOptions={[10, 25, 50, 100]}
-            checkboxSelection
-            onRowClick={(row) => navigate(`/dashboard/placements/${row.id}`)}
-            initialFilters={activeFilters}
-          />
-        </CardContent>
-      </Card>
+      {!loading && !error && (
+        <Card className="border-gray-200 shadow-sm overflow-hidden">
+          <CardContent className="p-0">
+            {placements.length > 0 ? (
+              <DataGrid
+                rows={placements.map(p => ({
+                  id: p.id,
+                  candidateName: `${p.candidate?.first_name || ''} ${p.candidate?.last_name || ''}`.trim() || 'Unknown',
+                  jobTitle: p.job?.title || 'Unknown',
+                  companyName: p.job?.company_name || p.company?.name || 'Unknown',
+                  startDate: p.start_date || '',
+                  placementDate: p.created_at || '',
+                  salary: p.salary || p.salary_amount || '0',
+                  commission: p.commission || p.commission_amount || '0',
+                  status: p.status || 'active',
+                  duration: p.placement_type || 'Permanent',
+                  recruiter: p.recruiter?.name || p.created_by_user?.name || 'Unknown',
+                  margin: p.margin || '0%',
+                }))}
+                columns={columns}
+                pageSizeOptions={[10, 25, 50, 100]}
+                checkboxSelection
+                onRowClick={(row) => navigate(`/dashboard/placements/${row.id}`)}
+                initialFilters={{}}
+              />
+            ) : (
+              <div className="p-8 text-center">
+                <Trophy className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600">No placements found</p>
+                {user?.role === "recruiter" && (
+                  <Button 
+                    onClick={() => navigate('/dashboard/jobs')} 
+                    className="mt-4"
+                    variant="outline"
+                  >
+                    View Jobs
+                  </Button>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };

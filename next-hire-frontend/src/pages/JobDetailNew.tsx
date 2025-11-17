@@ -3,8 +3,6 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { 
   MapPin, 
@@ -22,7 +20,6 @@ import {
   AlertCircle
 } from "lucide-react";
 import { useJob } from "@/hooks/useJobs";
-import { useSubmissionManagement } from "@/hooks/useSubmissions";
 import { useAuth } from "@/contexts/AuthContext";
 import { jobService } from "@/services/jobService";
 import { toast } from "sonner";
@@ -32,15 +29,10 @@ export default function JobDetail() {
   const navigate = useNavigate();
   const { user } = useAuth();
   
-  // Application state
-  const [isApplying, setIsApplying] = useState(false);
-  const [coverLetter, setCoverLetter] = useState("");
-  const [expectedSalary, setExpectedSalary] = useState("");
-  const [availabilityDate, setAvailabilityDate] = useState("");
+  // No longer needed - using dedicated application page
 
   // Hooks
   const { job, loading, error } = useJob(id || null, true);
-  const { applyToJob, loading: applying } = useSubmissionManagement();
 
   if (loading) {
     return (
@@ -88,26 +80,8 @@ export default function JobDetail() {
       return;
     }
 
-    // For now, we'll need to get the candidate ID from the user profile
-    // This would typically come from the candidate profile
-    const candidateId = user.id; // This is a simplification
-
-    try {
-      const submission = await applyToJob({
-        job_id: job.id,
-        candidate_id: candidateId,
-        cover_letter: coverLetter.trim() || undefined,
-        expected_salary: expectedSalary ? parseFloat(expectedSalary) : undefined,
-        availability_date: availabilityDate || undefined,
-      });
-
-      if (submission) {
-        setIsApplying(false);
-        toast.success("Application submitted successfully!");
-      }
-    } catch (error) {
-      console.error("Failed to apply:", error);
-    }
+    // Navigate to the dedicated application page
+    navigate(`/job/${job.id}/apply`);
   };
 
   const getTimeAgo = (dateString: string) => {
@@ -301,79 +275,18 @@ export default function JobDetail() {
                 <CardTitle>Apply for this job</CardTitle>
               </CardHeader>
               <CardContent>
-                {!isApplying ? (
-                  <div className="space-y-4">
-                    <Button 
-                      onClick={() => setIsApplying(true)}
-                      className="w-full bg-green-600 hover:bg-green-700"
-                      size="lg"
-                    >
-                      Apply Now
-                    </Button>
-                    <p className="text-sm text-gray-600 text-center">
-                      Quick apply with your profile
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-sm font-medium text-gray-700 mb-2 block">
-                        Cover Letter (Optional)
-                      </label>
-                      <Textarea
-                        placeholder="Tell us why you're interested in this role..."
-                        value={coverLetter}
-                        onChange={(e) => setCoverLetter(e.target.value)}
-                        rows={4}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-sm font-medium text-gray-700 mb-2 block">
-                        Expected Salary (Optional)
-                      </label>
-                      <Input
-                        type="number"
-                        placeholder="e.g., 80000"
-                        value={expectedSalary}
-                        onChange={(e) => setExpectedSalary(e.target.value)}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-sm font-medium text-gray-700 mb-2 block">
-                        Availability Date (Optional)
-                      </label>
-                      <Input
-                        type="date"
-                        value={availabilityDate}
-                        onChange={(e) => setAvailabilityDate(e.target.value)}
-                      />
-                    </div>
-
-                    <div className="flex gap-2">
-                      <Button 
-                        onClick={handleApply}
-                        disabled={applying}
-                        className="flex-1 bg-green-600 hover:bg-green-700"
-                      >
-                        {applying ? (
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        ) : (
-                          <CheckCircle className="w-4 h-4 mr-2" />
-                        )}
-                        Submit Application
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        onClick={() => setIsApplying(false)}
-                        disabled={applying}
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
-                )}
+                <div className="space-y-4">
+                  <Button 
+                    onClick={handleApply}
+                    className="w-full bg-green-600 hover:bg-green-700"
+                    size="lg"
+                  >
+                    Apply Now
+                  </Button>
+                  <p className="text-sm text-gray-600 text-center">
+                    Complete your application with detailed form
+                  </p>
+                </div>
               </CardContent>
             </Card>
 

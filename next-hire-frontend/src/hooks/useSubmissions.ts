@@ -339,9 +339,37 @@ export const useSubmissionStats = (jobId?: string) => {
     try {
       setLoading(true);
       
-      // Fetch all submissions for the job
-      const response = await submissionService.getJobSubmissions(jobId, { limit: 1000 });
-      const submissions = response.data.submissions;
+      // Fetch all submissions for the job using pagination (backend max limit is 100)
+      let allSubmissions: any[] = [];
+      let currentPage = 1;
+      let hasMore = true;
+      const limit = 100; // Backend max limit
+      
+      while (hasMore) {
+        try {
+          const response = await submissionService.getJobSubmissions(jobId, { 
+            page: currentPage, 
+            limit: limit 
+          });
+          
+          const pageSubmissions = response.data.submissions || [];
+          allSubmissions = [...allSubmissions, ...pageSubmissions];
+          
+          const pagination = response.data.pagination || {};
+          const totalPages = pagination.total_pages || pagination.totalPages || 1;
+          
+          if (currentPage >= totalPages || pageSubmissions.length < limit) {
+            hasMore = false;
+          } else {
+            currentPage++;
+          }
+        } catch (error) {
+          console.error(`Error fetching submissions page ${currentPage}:`, error);
+          hasMore = false;
+        }
+      }
+      
+      const submissions = allSubmissions;
 
       // Calculate stats
       const newStats = {
