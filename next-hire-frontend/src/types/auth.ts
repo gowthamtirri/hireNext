@@ -29,6 +29,8 @@ export interface SignupResponse {
   userId: string;
   email: string;
   role: UserRole;
+  emailSent?: boolean;
+  warning?: string;
 }
 
 export interface LoginRequest {

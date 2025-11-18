@@ -5,7 +5,7 @@ import { logger } from "./logger";
 const validateEmailConfig = () => {
   const required = ["SMTP_HOST", "SMTP_USER", "SMTP_PASS", "FROM_EMAIL"];
   const missing = required.filter((key) => !process.env[key]);
-  
+
   if (missing.length > 0) {
     logger.warn(`Missing email configuration: ${missing.join(", ")}`);
     return false;
@@ -27,7 +27,7 @@ if (validateEmailConfig()) {
         pass: process.env.SMTP_PASS,
       },
     });
-    
+
     // Verify connection
     transporter.verify((error) => {
       if (error) {
@@ -52,7 +52,9 @@ export interface EmailOptions {
 
 export const sendEmail = async (options: EmailOptions): Promise<boolean> => {
   if (!transporter) {
-    logger.error("Email transporter not configured. Please check your .env file.");
+    logger.error(
+      "Email transporter not configured. Please check your .env file."
+    );
     return false;
   }
 
@@ -71,15 +73,36 @@ export const sendEmail = async (options: EmailOptions): Promise<boolean> => {
       text: options.text,
     };
 
-    await transporter.sendMail(mailOptions);
-    logger.info(`Email sent successfully to ${options.to}`);
+    const info = await transporter.sendMail(mailOptions);
+    logger.info(`Email sent successfully to ${options.to}`, {
+      messageId: info.messageId,
+    });
     return true;
   } catch (error: any) {
-    logger.error("Failed to send email:", {
+    // Log detailed error information
+    const errorDetails: any = {
       error: error.message,
       to: options.to,
       subject: options.subject,
-    });
+    };
+
+    // Include response details if available (for Resend/SMTP errors)
+    if (error.response) {
+      errorDetails.response = error.response;
+    }
+    if (error.responseCode) {
+      errorDetails.responseCode = error.responseCode;
+    }
+
+    logger.error("Failed to send email:", errorDetails);
+
+    // If it's a Resend limitation error, provide helpful message
+    if (error.response && error.response.includes("only send testing emails")) {
+      logger.error(
+        "Resend limitation: You can only send to verified email or need domain verification. See: https://resend.com/domains"
+      );
+    }
+
     return false;
   }
 };

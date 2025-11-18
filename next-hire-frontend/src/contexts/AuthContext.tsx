@@ -66,9 +66,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       setIsLoading(true);
       const response = await authService.signup(data);
-      toast.success(
-        "Account created successfully! Please check your email for verification code."
-      );
+
+      // Check if email was sent successfully
+      if ((response as any).emailSent === false) {
+        toast.warning(
+          "Account created, but OTP email could not be sent. Please use the 'Resend OTP' option.",
+          { duration: 5000 }
+        );
+      } else {
+        toast.success(
+          "Account created successfully! Please check your email for verification code."
+        );
+      }
       return response;
     } catch (error: any) {
       toast.error(error.message || "Signup failed");
@@ -210,13 +219,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   // Update user role (for role selection)
-  const updateUserRole = useCallback((role: UserRole) => {
-    if (user) {
-      const updatedUser = { ...user, role };
-      setUser(updatedUser);
-      localStorage.setItem("user", JSON.stringify(updatedUser));
-    }
-  }, [user]);
+  const updateUserRole = useCallback(
+    (role: UserRole) => {
+      if (user) {
+        const updatedUser = { ...user, role };
+        setUser(updatedUser);
+        localStorage.setItem("user", JSON.stringify(updatedUser));
+      }
+    },
+    [user]
+  );
 
   const value: AuthContextType = {
     // State

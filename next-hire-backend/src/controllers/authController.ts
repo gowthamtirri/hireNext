@@ -91,8 +91,23 @@ export const signup = asyncHandler(async (req: Request, res: Response) => {
 
   // Send OTP email
   const emailSent = await sendOTPEmail(email, otp);
+
   if (!emailSent) {
     logger.error(`Failed to send OTP email to ${email}`);
+    // Still return success but warn about email failure
+    return res.status(201).json({
+      success: true,
+      message:
+        "User created successfully. However, we were unable to send the OTP email. Please contact support or try resending the OTP.",
+      data: {
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+        emailSent: false,
+        warning:
+          "OTP email could not be sent. Please use the resend OTP feature.",
+      },
+    });
   }
 
   res.status(201).json({
@@ -103,7 +118,7 @@ export const signup = asyncHandler(async (req: Request, res: Response) => {
       userId: user.id,
       email: user.email,
       role: user.role,
-      emailSent,
+      emailSent: true,
     },
   });
 });
