@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -98,6 +98,19 @@ const AddNewJob = () => {
     },
   });
 
+  const formValuesRef = useRef<Record<string, any>>(form.getValues());
+
+  useEffect(() => {
+    const subscription = form.watch((value) => {
+      formValuesRef.current = value;
+    });
+    return () => subscription.unsubscribe();
+  }, [form]);
+
+  useEffect(() => {
+    form.reset(formValuesRef.current);
+  }, [currentStep, form]);
+
   const steps = [
     { id: 1, title: "Basic Info", icon: Briefcase },
     { id: 2, title: "Details", icon: FileText },
@@ -181,7 +194,14 @@ const AddNewJob = () => {
     return undefined;
   };
 
-  const handleSubmit = async (data: any) => {
+  const getTrimmedString = (value: unknown) =>
+    typeof value === "string" ? value.trim() : "";
+
+  const handleSubmit = async (submittedData: any) => {
+    const data = {
+      ...formValuesRef.current,
+      ...submittedData,
+    };
     // Ensure we're on the final step before submitting
     if (currentStep !== 4) {
       showIncompleteStepsToast();
@@ -268,6 +288,8 @@ const AddNewJob = () => {
         job_type: mappedJobType, // Required field, already validated
         country: data.country?.trim() || "US", // Always send country
         salary_currency: data.salaryCurrency || "USD", // Always send currency
+        city: getTrimmedString(data.city),
+        state: getTrimmedString(data.state),
       };
 
       // Ensure description is not empty (backend requires it)
@@ -294,41 +316,34 @@ const AddNewJob = () => {
       }
 
       // Optional fields - only add if they have values
-      if (data.externalJobDescription?.trim()) {
-        jobData.external_description = data.externalJobDescription.trim();
-      }
-
-      if (data.city?.trim()) {
-        jobData.city = data.city.trim();
-      }
-
-      if (data.state?.trim()) {
-        jobData.state = data.state.trim();
+      let externalDescription = getTrimmedString(data.externalJobDescription);
+      if (externalDescription) {
+        jobData.external_description = externalDescription;
       }
 
       // Salary fields
       // Note: salary_currency is already set in initial jobData object above
 
       const salaryMin = parseNumberInput(data.salaryMin);
-      if (salaryMin !== undefined && salaryMin >= 0) {
-        jobData.salary_min = salaryMin;
-      }
+      jobData.salary_min =
+        salaryMin !== undefined && salaryMin >= 0 ? salaryMin : null;
 
       const salaryMax = parseNumberInput(data.salaryMax);
-      if (salaryMax !== undefined && salaryMax >= 0) {
-        jobData.salary_max = salaryMax;
-      }
+      jobData.salary_max =
+        salaryMax !== undefined && salaryMax >= 0 ? salaryMax : null;
 
       // Experience fields
       const experienceMin = parseNumberInput(data.experienceMin);
-      if (experienceMin !== undefined && experienceMin >= 0) {
-        jobData.experience_min = Math.floor(experienceMin);
-      }
+      jobData.experience_min =
+        experienceMin !== undefined && experienceMin >= 0
+          ? Math.floor(experienceMin)
+          : null;
 
       const experienceMax = parseNumberInput(data.experienceMax);
-      if (experienceMax !== undefined && experienceMax >= 0) {
-        jobData.experience_max = Math.floor(experienceMax);
-      }
+      jobData.experience_max =
+        experienceMax !== undefined && experienceMax >= 0
+          ? Math.floor(experienceMax)
+          : null;
 
       // Skills
       jobData.required_skills = [...skills];
@@ -352,17 +367,16 @@ const AddNewJob = () => {
       const positionsValue = parseNumberInput(
         data.numberOfPositions ?? data.positionsAvailable
       );
-      if (positionsValue !== undefined && positionsValue >= 1) {
-        jobData.positions_available = Math.floor(positionsValue);
-      } else {
-        // Default to 1 if not provided
-        jobData.positions_available = 1;
-      }
+      jobData.positions_available =
+        positionsValue !== undefined && positionsValue >= 1
+          ? Math.floor(positionsValue)
+          : 1;
 
       const maxSubmissions = parseNumberInput(data.maxSubmissionsAllowed);
-      if (maxSubmissions !== undefined && maxSubmissions >= 1) {
-        jobData.max_submissions_allowed = Math.floor(maxSubmissions);
-      }
+      jobData.max_submissions_allowed =
+        maxSubmissions !== undefined && maxSubmissions >= 1
+          ? Math.floor(maxSubmissions)
+          : null;
 
       // Terms fields - store in payload and external description for readability
       const trimmedTaxTerms = data.taxTerms?.trim();
@@ -405,11 +419,9 @@ const AddNewJob = () => {
       }
 
       if (termsInfo) {
-        if (jobData.external_description) {
-          jobData.external_description = `${jobData.external_description}\n\n${termsInfo}`;
-        } else {
-          jobData.external_description = termsInfo.trim();
-        }
+        externalDescription = externalDescription
+          ? `${externalDescription}\n\n${termsInfo}`.trim()
+          : termsInfo.trim();
       }
 
       // Boolean fields
@@ -470,11 +482,13 @@ const AddNewJob = () => {
       }
 
       if (clientInfo) {
-        if (jobData.external_description) {
-          jobData.external_description = `${jobData.external_description}\n\n${clientInfo}`;
-        } else {
-          jobData.external_description = clientInfo.trim();
-        }
+        externalDescription = externalDescription
+          ? `${externalDescription}\n\n${clientInfo}`.trim()
+          : clientInfo.trim();
+      }
+
+      if (externalDescription !== undefined) {
+        jobData.external_description = externalDescription;
       }
 
       // Log all form data for debugging
@@ -567,8 +581,8 @@ const AddNewJob = () => {
     if (currentStep > 1) setCurrentStep(currentStep - 1);
   };
 
-  const renderStepContent = () => {
-    switch (currentStep) {
+  const getStepMarkup = (step: number) => {
+    switch (step) {
       case 1:
         return (
           <div className="space-y-6">
@@ -1381,6 +1395,13 @@ const AddNewJob = () => {
         return null;
     }
   };
+
+  const renderStepContent = () =>
+    [1, 2, 3, 4].map((step) => (
+      <div key={step} className={currentStep === step ? "block" : "hidden"}>
+        {getStepMarkup(step)}
+      </div>
+    ));
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
