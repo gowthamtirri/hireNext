@@ -109,14 +109,14 @@ const startServer = async () => {
     // Sync database (in development)
     if (process.env.NODE_ENV === "development") {
       try {
-        await sequelize.sync({ force: true });
+        // Use alter: true to preserve existing data while updating schema
+        // IMPORTANT: Do NOT use force: true as it drops all tables and data!
+        await sequelize.sync({ alter: true });
         logger.info("Database synchronized successfully.");
       } catch (syncError) {
-        logger.error("Database sync failed, trying to recreate:", syncError);
-        // If sync fails, drop and recreate
-        await sequelize.drop();
-        await sequelize.sync({ force: true });
-        logger.info("Database recreated successfully.");
+        logger.error("Database sync failed:", syncError);
+        logger.warn("Database sync failed. If you need to recreate the database, run: npm run db:reset");
+        // Don't automatically drop the database - user data is important!
       }
     }
 
