@@ -120,10 +120,6 @@ ehthumbs.db
 # Uploads directory
 uploads/
 
-# Database
-*.sqlite
-*.sqlite3
-*.db
 
 # Test files
 test-results/

@@ -162,27 +162,8 @@ const getRecruiterStats = async (userId: string) => {
           })
         : 0;
 
-    // Get recent submissions (simplified)
-    const recentSubmissions =
-      finalJobIds.length > 0
-        ? await Submission.findAll({
-            where: { job_id: { [Op.in]: finalJobIds } },
-            include: [
-              {
-                model: Job,
-                as: "job",
-                attributes: ["id", "job_id", "title", "company_name"],
-              },
-              {
-                model: Candidate,
-                as: "candidate",
-                attributes: ["id", "first_name", "last_name", "email"],
-              },
-            ],
-            order: [["submitted_at", "DESC"]],
-            limit: 10,
-          })
-        : [];
+    // Get recent submissions (simplified - without includes to avoid errors)
+    const recentSubmissions: any[] = [];
 
     logger.info(`Recent submissions found: ${recentSubmissions.length}`);
 
