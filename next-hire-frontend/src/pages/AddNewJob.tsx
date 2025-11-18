@@ -4,11 +4,24 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import {
   Plus,
   Building2,
@@ -26,7 +39,7 @@ import {
   CheckCircle,
   AlertCircle,
   Clock,
-  Trash2
+  Trash2,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
@@ -46,6 +59,7 @@ const AddNewJob = () => {
   const [newSecondarySkill, setNewSecondarySkill] = useState("");
 
   const form = useForm({
+    shouldUnregister: false,
     defaultValues: {
       jobTitle: "",
       customer: "",
@@ -80,22 +94,23 @@ const AddNewJob = () => {
       paymentTerms: "",
       expensePaid: false,
       spokenLanguages: "",
-      documentsRequired: ""
-    }
+      documentsRequired: "",
+    },
   });
 
   const steps = [
     { id: 1, title: "Basic Info", icon: Briefcase },
     { id: 2, title: "Details", icon: FileText },
     { id: 3, title: "Requirements", icon: Target },
-    { id: 4, title: "Terms", icon: Settings }
+    { id: 4, title: "Terms", icon: Settings },
   ];
 
-  const addSkill = (type: 'primary' | 'secondary') => {
-    const skill = type === 'primary' ? newSkill : newSecondarySkill;
-    const setSkillsArray = type === 'primary' ? setSkills : setSecondarySkills;
-    const currentSkills = type === 'primary' ? skills : secondarySkills;
-    const setNewSkillState = type === 'primary' ? setNewSkill : setNewSecondarySkill;
+  const addSkill = (type: "primary" | "secondary") => {
+    const skill = type === "primary" ? newSkill : newSecondarySkill;
+    const setSkillsArray = type === "primary" ? setSkills : setSecondarySkills;
+    const currentSkills = type === "primary" ? skills : secondarySkills;
+    const setNewSkillState =
+      type === "primary" ? setNewSkill : setNewSecondarySkill;
 
     if (skill.trim() && !currentSkills.includes(skill.trim())) {
       setSkillsArray([...currentSkills, skill.trim()]);
@@ -103,10 +118,13 @@ const AddNewJob = () => {
     }
   };
 
-  const removeSkill = (skillToRemove: string, type: 'primary' | 'secondary') => {
-    const setSkillsArray = type === 'primary' ? setSkills : setSecondarySkills;
-    const currentSkills = type === 'primary' ? skills : secondarySkills;
-    setSkillsArray(currentSkills.filter(skill => skill !== skillToRemove));
+  const removeSkill = (
+    skillToRemove: string,
+    type: "primary" | "secondary"
+  ) => {
+    const setSkillsArray = type === "primary" ? setSkills : setSecondarySkills;
+    const currentSkills = type === "primary" ? skills : secondarySkills;
+    setSkillsArray(currentSkills.filter((skill) => skill !== skillToRemove));
   };
 
   // Helper functions to map form values to API format
@@ -114,41 +132,59 @@ const AddNewJob = () => {
     const mapping: Record<string, string> = {
       "Full-time": "full_time",
       "Part-time": "part_time",
-      "Contract": "contract",
-      "Temporary": "temporary",
+      Contract: "contract",
+      Temporary: "temporary",
       "Full Time": "full_time",
       "Part Time": "part_time",
     };
-    return mapping[jobType] || jobType?.toLowerCase().replace(/[\s-]/g, '_');
+    return mapping[jobType] || jobType?.toLowerCase().replace(/[\s-]/g, "_");
   };
 
   const mapPriorityToAPI = (priority: string) => {
     const mapping: Record<string, string> = {
-      "High": "high",
-      "Medium": "medium", 
-      "Low": "low",
+      High: "high",
+      Medium: "medium",
+      Low: "low",
     };
     return mapping[priority] || priority?.toLowerCase();
   };
 
   const mapStatusToAPI = (status: string) => {
     const mapping: Record<string, string> = {
-      "Draft": "draft",
-      "Active": "active",
-      "Paused": "paused",
-      "Closed": "closed",
+      Draft: "draft",
+      Active: "active",
+      Paused: "paused",
+      Closed: "closed",
     };
     return mapping[status] || status?.toLowerCase();
+  };
+
+  const showIncompleteStepsToast = () => {
+    toast({
+      title: "Please Complete All Steps",
+      description: "Please complete all steps before submitting.",
+      variant: "destructive",
+    });
+  };
+
+  const parseNumberInput = (value: unknown) => {
+    if (value === null || value === undefined) return undefined;
+    if (typeof value === "number") {
+      return Number.isNaN(value) ? undefined : value;
+    }
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (!trimmed) return undefined;
+      const parsed = Number(trimmed);
+      return Number.isNaN(parsed) ? undefined : parsed;
+    }
+    return undefined;
   };
 
   const handleSubmit = async (data: any) => {
     // Ensure we're on the final step before submitting
     if (currentStep !== 4) {
-      toast({
-        title: "Please Complete All Steps",
-        description: "Please complete all steps before submitting.",
-        variant: "destructive",
-      });
+      showIncompleteStepsToast();
       return;
     }
 
@@ -174,7 +210,7 @@ const AddNewJob = () => {
         setIsSubmitting(false);
         return;
       }
-      
+
       if (!data.jobDescription?.trim()) {
         toast({
           title: "Validation Error",
@@ -184,7 +220,7 @@ const AddNewJob = () => {
         setIsSubmitting(false);
         return;
       }
-      
+
       if (!data.customer?.trim()) {
         toast({
           title: "Validation Error",
@@ -208,7 +244,12 @@ const AddNewJob = () => {
 
       // Validate job type (backend requires it)
       const mappedJobType = mapJobTypeToAPI(data.jobType);
-      if (!mappedJobType || !["full_time", "part_time", "contract", "temporary"].includes(mappedJobType)) {
+      if (
+        !mappedJobType ||
+        !["full_time", "part_time", "contract", "temporary"].includes(
+          mappedJobType
+        )
+      ) {
         toast({
           title: "Validation Error",
           description: "Please select a valid job type",
@@ -225,10 +266,10 @@ const AddNewJob = () => {
         company_name: data.customer.trim(),
         location: data.location.trim(), // Required field
         job_type: mappedJobType, // Required field, already validated
-        country: (data.country?.trim() || "US"), // Always send country
-        salary_currency: (data.salaryCurrency || "USD"), // Always send currency
+        country: data.country?.trim() || "US", // Always send country
+        salary_currency: data.salaryCurrency || "USD", // Always send currency
       };
-      
+
       // Ensure description is not empty (backend requires it)
       if (!jobData.description) {
         toast({
@@ -242,7 +283,10 @@ const AddNewJob = () => {
 
       // Status - map from form to API format (default to active)
       const mappedStatus = mapStatusToAPI(data.jobStatus);
-      if (mappedStatus && ["draft", "active", "paused", "closed"].includes(mappedStatus)) {
+      if (
+        mappedStatus &&
+        ["draft", "active", "paused", "closed"].includes(mappedStatus)
+      ) {
         jobData.status = mappedStatus;
       } else {
         // Default to active if not specified or invalid
@@ -253,55 +297,42 @@ const AddNewJob = () => {
       if (data.externalJobDescription?.trim()) {
         jobData.external_description = data.externalJobDescription.trim();
       }
-      
+
       if (data.city?.trim()) {
         jobData.city = data.city.trim();
       }
-      
+
       if (data.state?.trim()) {
         jobData.state = data.state.trim();
       }
 
       // Salary fields
       // Note: salary_currency is already set in initial jobData object above
-      
-      if (data.salaryMin && data.salaryMin.toString().trim() !== "") {
-        const salaryMin = parseFloat(data.salaryMin);
-        if (!isNaN(salaryMin) && salaryMin >= 0) {
-          jobData.salary_min = salaryMin;
-        }
+
+      const salaryMin = parseNumberInput(data.salaryMin);
+      if (salaryMin !== undefined && salaryMin >= 0) {
+        jobData.salary_min = salaryMin;
       }
-      
-      if (data.salaryMax && data.salaryMax.toString().trim() !== "") {
-        const salaryMax = parseFloat(data.salaryMax);
-        if (!isNaN(salaryMax) && salaryMax >= 0) {
-          jobData.salary_max = salaryMax;
-        }
+
+      const salaryMax = parseNumberInput(data.salaryMax);
+      if (salaryMax !== undefined && salaryMax >= 0) {
+        jobData.salary_max = salaryMax;
       }
 
       // Experience fields
-      if (data.experienceMin && data.experienceMin.toString().trim() !== "") {
-        const expMin = parseInt(data.experienceMin.toString());
-        if (!isNaN(expMin) && expMin >= 0) {
-          jobData.experience_min = expMin;
-        }
+      const experienceMin = parseNumberInput(data.experienceMin);
+      if (experienceMin !== undefined && experienceMin >= 0) {
+        jobData.experience_min = Math.floor(experienceMin);
       }
-      
-      if (data.experienceMax && data.experienceMax.toString().trim() !== "") {
-        const expMax = parseInt(data.experienceMax.toString());
-        if (!isNaN(expMax) && expMax >= 0) {
-          jobData.experience_max = expMax;
-        }
+
+      const experienceMax = parseNumberInput(data.experienceMax);
+      if (experienceMax !== undefined && experienceMax >= 0) {
+        jobData.experience_max = Math.floor(experienceMax);
       }
 
       // Skills
-      if (skills.length > 0) {
-        jobData.required_skills = skills;
-      }
-      
-      if (secondarySkills.length > 0) {
-        jobData.preferred_skills = secondarySkills;
-      }
+      jobData.required_skills = [...skills];
+      jobData.preferred_skills = [...secondarySkills];
 
       // Other optional fields
       if (data.educationRequirements?.trim()) {
@@ -310,47 +341,69 @@ const AddNewJob = () => {
 
       // Priority (optional, defaults to medium in backend)
       const mappedPriority = mapPriorityToAPI(data.priority);
-      if (mappedPriority && ["low", "medium", "high"].includes(mappedPriority)) {
+      if (
+        mappedPriority &&
+        ["low", "medium", "high"].includes(mappedPriority)
+      ) {
         jobData.priority = mappedPriority;
       }
 
       // Positions available - check both numberOfPositions and positionsAvailable
-      const positionsValue = data.numberOfPositions || data.positionsAvailable;
-      if (positionsValue && positionsValue.toString().trim() !== "") {
-        const positions = parseInt(positionsValue.toString());
-        if (!isNaN(positions) && positions >= 1) {
-          jobData.positions_available = positions;
-        }
+      const positionsValue = parseNumberInput(
+        data.numberOfPositions ?? data.positionsAvailable
+      );
+      if (positionsValue !== undefined && positionsValue >= 1) {
+        jobData.positions_available = Math.floor(positionsValue);
       } else {
         // Default to 1 if not provided
         jobData.positions_available = 1;
       }
 
-      if (data.maxSubmissionsAllowed && data.maxSubmissionsAllowed.toString().trim() !== "") {
-        const maxSubs = parseInt(data.maxSubmissionsAllowed.toString());
-        if (!isNaN(maxSubs) && maxSubs >= 1) {
-          jobData.max_submissions_allowed = maxSubs;
-        }
+      const maxSubmissions = parseNumberInput(data.maxSubmissionsAllowed);
+      if (maxSubmissions !== undefined && maxSubmissions >= 1) {
+        jobData.max_submissions_allowed = Math.floor(maxSubmissions);
       }
 
-      // Terms fields - store in external_description or as custom fields
-      let termsInfo = "";
-      if (data.taxTerms?.trim()) {
-        termsInfo += `Tax Terms: ${data.taxTerms.trim()}\n`;
+      // Terms fields - store in payload and external description for readability
+      const trimmedTaxTerms = data.taxTerms?.trim();
+      if (trimmedTaxTerms) {
+        jobData.tax_terms = trimmedTaxTerms;
       }
-      if (data.paymentTerms?.trim()) {
-        termsInfo += `Payment Terms: ${data.paymentTerms.trim()}\n`;
+
+      const trimmedPaymentTerms = data.paymentTerms?.trim();
+      if (trimmedPaymentTerms) {
+        jobData.payment_terms = trimmedPaymentTerms;
+      }
+
+      jobData.expense_paid = Boolean(data.expensePaid);
+
+      const trimmedSpokenLanguages = data.spokenLanguages?.trim();
+      if (trimmedSpokenLanguages) {
+        jobData.spoken_languages = trimmedSpokenLanguages;
+      }
+
+      const trimmedDocumentsRequired = data.documentsRequired?.trim();
+      if (trimmedDocumentsRequired) {
+        jobData.documents_required = trimmedDocumentsRequired;
+      }
+
+      let termsInfo = "";
+      if (trimmedTaxTerms) {
+        termsInfo += `Tax Terms: ${trimmedTaxTerms}\n`;
+      }
+      if (trimmedPaymentTerms) {
+        termsInfo += `Payment Terms: ${trimmedPaymentTerms}\n`;
       }
       if (data.expensePaid !== undefined) {
         termsInfo += `Expenses Paid: ${data.expensePaid ? "Yes" : "No"}\n`;
       }
-      if (data.spokenLanguages?.trim()) {
-        termsInfo += `Spoken Languages: ${data.spokenLanguages.trim()}\n`;
+      if (trimmedSpokenLanguages) {
+        termsInfo += `Spoken Languages: ${trimmedSpokenLanguages}\n`;
       }
-      if (data.documentsRequired?.trim()) {
-        termsInfo += `Required Documents: ${data.documentsRequired.trim()}\n`;
+      if (trimmedDocumentsRequired) {
+        termsInfo += `Required Documents: ${trimmedDocumentsRequired}\n`;
       }
-      
+
       if (termsInfo) {
         if (jobData.external_description) {
           jobData.external_description = `${jobData.external_description}\n\n${termsInfo}`;
@@ -366,7 +419,7 @@ const AddNewJob = () => {
       // Date fields - check both field names (jobStartDate/jobEndDate from form, startDate/endDate for compatibility)
       const startDateValue = data.jobStartDate || data.startDate;
       const endDateValue = data.jobEndDate || data.endDate;
-      
+
       if (startDateValue) {
         try {
           jobData.start_date = new Date(startDateValue).toISOString();
@@ -374,7 +427,7 @@ const AddNewJob = () => {
           console.warn("Invalid start date:", startDateValue);
         }
       }
-      
+
       if (endDateValue) {
         try {
           jobData.end_date = new Date(endDateValue).toISOString();
@@ -382,25 +435,40 @@ const AddNewJob = () => {
           console.warn("Invalid end date:", endDateValue);
         }
       }
-      
+
       if (data.applicationDeadline) {
         try {
-          jobData.application_deadline = new Date(data.applicationDeadline).toISOString();
+          jobData.application_deadline = new Date(
+            data.applicationDeadline
+          ).toISOString();
         } catch (e) {
-          console.warn("Invalid application deadline:", data.applicationDeadline);
+          console.warn(
+            "Invalid application deadline:",
+            data.applicationDeadline
+          );
         }
       }
 
       // Client fields - append to external_description to preserve the data
       // These can be extracted later if backend adds dedicated fields
+      const trimmedClientContact = data.clientContact?.trim();
+      if (trimmedClientContact) {
+        jobData.client_contact = trimmedClientContact;
+      }
+
+      const trimmedClientJobId = data.clientJobId?.trim();
+      if (trimmedClientJobId) {
+        jobData.client_job_id = trimmedClientJobId;
+      }
+
       let clientInfo = "";
-      if (data.clientContact?.trim()) {
-        clientInfo += `Client Contact: ${data.clientContact.trim()}\n`;
+      if (trimmedClientContact) {
+        clientInfo += `Client Contact: ${trimmedClientContact}\n`;
       }
-      if (data.clientJobId?.trim()) {
-        clientInfo += `Client Job ID: ${data.clientJobId.trim()}\n`;
+      if (trimmedClientJobId) {
+        clientInfo += `Client Job ID: ${trimmedClientJobId}\n`;
       }
-      
+
       if (clientInfo) {
         if (jobData.external_description) {
           jobData.external_description = `${jobData.external_description}\n\n${clientInfo}`;
@@ -410,15 +478,15 @@ const AddNewJob = () => {
       }
 
       // Log all form data for debugging
-      console.log('=== FORM DATA DEBUG ===');
-      console.log('Raw form data:', data);
-      console.log('Skills:', { required: skills, preferred: secondarySkills });
-      console.log('Processed job data:', JSON.stringify(jobData, null, 2));
-      console.log('=== END DEBUG ===');
-      
+      console.log("=== FORM DATA DEBUG ===");
+      console.log("Raw form data:", data);
+      console.log("Skills:", { required: skills, preferred: secondarySkills });
+      console.log("Processed job data:", JSON.stringify(jobData, null, 2));
+      console.log("=== END DEBUG ===");
+
       const response = await recruiterService.createJob(jobData);
-      console.log('Job creation response:', response);
-      
+      console.log("Job creation response:", response);
+
       // Handle response structure - backend returns { success: true, data: job, message: "..." }
       if (response.success || response.data) {
         toast({
@@ -428,30 +496,35 @@ const AddNewJob = () => {
 
         // Small delay to show success message
         setTimeout(() => {
-        navigate("/dashboard/jobs");
+          navigate("/dashboard/jobs");
         }, 1000);
       } else {
         throw new Error(response.message || "Failed to create job");
       }
     } catch (error: any) {
-      console.error('Error creating job:', error);
-      console.error('Error details:', {
+      console.error("Error creating job:", error);
+      console.error("Error details:", {
         message: error.message,
         response: error.response?.data,
         status: error.response?.status,
       });
-      
+
       // Better error handling for validation errors
       let errorMessage = "An unexpected error occurred";
-      
+
       if (error.response?.data) {
         const errorData = error.response.data;
-        
+
         // Handle validation errors array
-        if (errorData.errors && Array.isArray(errorData.errors) && errorData.errors.length > 0) {
+        if (
+          errorData.errors &&
+          Array.isArray(errorData.errors) &&
+          errorData.errors.length > 0
+        ) {
           const firstError = errorData.errors[0];
-          errorMessage = firstError.message || firstError.msg || "Validation error";
-        } 
+          errorMessage =
+            firstError.message || firstError.msg || "Validation error";
+        }
         // Handle single error message (validation middleware joins all errors with ", ")
         else if (errorData.message) {
           errorMessage = errorData.message;
@@ -461,13 +534,13 @@ const AddNewJob = () => {
           }
         }
         // Handle error string
-        else if (typeof errorData === 'string') {
+        else if (typeof errorData === "string") {
           errorMessage = errorData;
         }
       } else if (error.message) {
         errorMessage = error.message;
       }
-      
+
       toast({
         title: "Error Creating Job",
         description: errorMessage,
@@ -476,6 +549,14 @@ const AddNewJob = () => {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleCreateJobClick = () => {
+    if (currentStep !== 4) {
+      showIncompleteStepsToast();
+      return;
+    }
+    form.handleSubmit(handleSubmit)();
   };
 
   const nextStep = () => {
@@ -497,23 +578,35 @@ const AddNewJob = () => {
                 name="jobTitle"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-gray-700 font-medium">Job Title *</FormLabel>
+                    <FormLabel className="text-gray-700 font-medium">
+                      Job Title *
+                    </FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g. Senior React Developer" className="border-gray-200 focus:border-green-400" {...field} />
+                      <Input
+                        placeholder="e.g. Senior React Developer"
+                        className="border-gray-200 focus:border-green-400"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              
+
               <FormField
                 control={form.control}
                 name="customer"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-gray-700 font-medium">Company *</FormLabel>
+                    <FormLabel className="text-gray-700 font-medium">
+                      Company *
+                    </FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g. TechCorp Inc" className="border-gray-200 focus:border-green-400" {...field} />
+                      <Input
+                        placeholder="e.g. TechCorp Inc"
+                        className="border-gray-200 focus:border-green-400"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -521,13 +614,15 @@ const AddNewJob = () => {
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               <FormField
                 control={form.control}
                 name="jobType"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-gray-700 font-medium">Job Type *</FormLabel>
+                    <FormLabel className="text-gray-700 font-medium">
+                      Job Type *
+                    </FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger className="border-gray-200 focus:border-green-400">
@@ -551,7 +646,9 @@ const AddNewJob = () => {
                 name="priority"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-gray-700 font-medium">Priority *</FormLabel>
+                    <FormLabel className="text-gray-700 font-medium">
+                      Priority *
+                    </FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger className="border-gray-200 focus:border-green-400">
@@ -571,12 +668,44 @@ const AddNewJob = () => {
 
               <FormField
                 control={form.control}
+                name="jobStatus"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-gray-700 font-medium">
+                      Job Status *
+                    </FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger className="border-gray-200 focus:border-green-400">
+                          <SelectValue placeholder="Select status" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent className="bg-white">
+                        <SelectItem value="Active">Active</SelectItem>
+                        <SelectItem value="Draft">Draft</SelectItem>
+                        <SelectItem value="Paused">Paused</SelectItem>
+                        <SelectItem value="Closed">Closed</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
                 name="location"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-gray-700 font-medium">Location *</FormLabel>
+                    <FormLabel className="text-gray-700 font-medium">
+                      Location *
+                    </FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g. San Francisco, CA or Remote" className="border-gray-200 focus:border-green-400" {...field} />
+                      <Input
+                        placeholder="e.g. San Francisco, CA or Remote"
+                        className="border-gray-200 focus:border-green-400"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -590,9 +719,15 @@ const AddNewJob = () => {
                 name="city"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-gray-700 font-medium">City</FormLabel>
+                    <FormLabel className="text-gray-700 font-medium">
+                      City
+                    </FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g. San Francisco" className="border-gray-200 focus:border-green-400" {...field} />
+                      <Input
+                        placeholder="e.g. San Francisco"
+                        className="border-gray-200 focus:border-green-400"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -604,9 +739,15 @@ const AddNewJob = () => {
                 name="state"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-gray-700 font-medium">State</FormLabel>
+                    <FormLabel className="text-gray-700 font-medium">
+                      State
+                    </FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g. CA" className="border-gray-200 focus:border-green-400" {...field} />
+                      <Input
+                        placeholder="e.g. CA"
+                        className="border-gray-200 focus:border-green-400"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -618,7 +759,9 @@ const AddNewJob = () => {
                 name="country"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-gray-700 font-medium">Country</FormLabel>
+                    <FormLabel className="text-gray-700 font-medium">
+                      Country
+                    </FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger className="border-gray-200 focus:border-green-400">
@@ -648,23 +791,37 @@ const AddNewJob = () => {
                 name="salaryMin"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-gray-700 font-medium">Min Salary</FormLabel>
+                    <FormLabel className="text-gray-700 font-medium">
+                      Min Salary
+                    </FormLabel>
                     <FormControl>
-                      <Input type="number" placeholder="e.g. 120000" className="border-gray-200 focus:border-green-400" {...field} />
+                      <Input
+                        type="number"
+                        placeholder="e.g. 120000"
+                        className="border-gray-200 focus:border-green-400"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              
+
               <FormField
                 control={form.control}
                 name="salaryMax"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-gray-700 font-medium">Max Salary</FormLabel>
+                    <FormLabel className="text-gray-700 font-medium">
+                      Max Salary
+                    </FormLabel>
                     <FormControl>
-                      <Input type="number" placeholder="e.g. 150000" className="border-gray-200 focus:border-green-400" {...field} />
+                      <Input
+                        type="number"
+                        placeholder="e.g. 150000"
+                        className="border-gray-200 focus:border-green-400"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -676,8 +833,10 @@ const AddNewJob = () => {
                 name="salaryCurrency"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-gray-700 font-medium">Currency</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormLabel className="text-gray-700 font-medium">
+                      Currency
+                    </FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger className="border-gray-200 focus:border-green-400">
                           <SelectValue placeholder="Select currency" />
@@ -705,9 +864,11 @@ const AddNewJob = () => {
               name="jobDescription"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-gray-700 font-medium">Internal Job Description *</FormLabel>
+                  <FormLabel className="text-gray-700 font-medium">
+                    Internal Job Description *
+                  </FormLabel>
                   <FormControl>
-                    <Textarea 
+                    <Textarea
                       placeholder="Detailed description for internal use..."
                       className="min-h-[120px] border-gray-200 focus:border-green-400"
                       {...field}
@@ -723,9 +884,11 @@ const AddNewJob = () => {
               name="externalJobDescription"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-gray-700 font-medium">External Job Description</FormLabel>
+                  <FormLabel className="text-gray-700 font-medium">
+                    External Job Description
+                  </FormLabel>
                   <FormControl>
-                    <Textarea 
+                    <Textarea
                       placeholder="Description for job boards and candidates..."
                       className="min-h-[120px] border-gray-200 focus:border-green-400"
                       {...field}
@@ -736,15 +899,21 @@ const AddNewJob = () => {
               )}
             />
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <FormField
                 control={form.control}
                 name="jobStartDate"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-gray-700 font-medium">Start Date</FormLabel>
+                    <FormLabel className="text-gray-700 font-medium">
+                      Start Date
+                    </FormLabel>
                     <FormControl>
-                      <Input type="date" className="border-gray-200 focus:border-green-400" {...field} />
+                      <Input
+                        type="date"
+                        className="border-gray-200 focus:border-green-400"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -756,9 +925,35 @@ const AddNewJob = () => {
                 name="jobEndDate"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-gray-700 font-medium">End Date</FormLabel>
+                    <FormLabel className="text-gray-700 font-medium">
+                      End Date
+                    </FormLabel>
                     <FormControl>
-                      <Input type="date" className="border-gray-200 focus:border-green-400" {...field} />
+                      <Input
+                        type="date"
+                        className="border-gray-200 focus:border-green-400"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="applicationDeadline"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-gray-700 font-medium">
+                      Application Deadline
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type="date"
+                        className="border-gray-200 focus:border-green-400"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -772,9 +967,15 @@ const AddNewJob = () => {
                 name="clientContact"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-gray-700 font-medium">Client Contact</FormLabel>
+                    <FormLabel className="text-gray-700 font-medium">
+                      Client Contact
+                    </FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g. John Smith" className="border-gray-200 focus:border-green-400" {...field} />
+                      <Input
+                        placeholder="e.g. John Smith"
+                        className="border-gray-200 focus:border-green-400"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -786,9 +987,15 @@ const AddNewJob = () => {
                 name="clientJobId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-gray-700 font-medium">Client Job ID</FormLabel>
+                    <FormLabel className="text-gray-700 font-medium">
+                      Client Job ID
+                    </FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g. TC-001" className="border-gray-200 focus:border-green-400" {...field} />
+                      <Input
+                        placeholder="e.g. TC-001"
+                        className="border-gray-200 focus:border-green-400"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -804,12 +1011,19 @@ const AddNewJob = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <FormField
                 control={form.control}
-                name="minExperience"
+                name="experienceMin"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-gray-700 font-medium">Min Experience (years)</FormLabel>
+                    <FormLabel className="text-gray-700 font-medium">
+                      Min Experience (years)
+                    </FormLabel>
                     <FormControl>
-                      <Input type="number" placeholder="e.g. 2" className="border-gray-200 focus:border-green-400" {...field} />
+                      <Input
+                        type="number"
+                        placeholder="e.g. 2"
+                        className="border-gray-200 focus:border-green-400"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -818,12 +1032,19 @@ const AddNewJob = () => {
 
               <FormField
                 control={form.control}
-                name="maxExperience"
+                name="experienceMax"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-gray-700 font-medium">Max Experience (years)</FormLabel>
+                    <FormLabel className="text-gray-700 font-medium">
+                      Max Experience (years)
+                    </FormLabel>
                     <FormControl>
-                      <Input type="number" placeholder="e.g. 8" className="border-gray-200 focus:border-green-400" {...field} />
+                      <Input
+                        type="number"
+                        placeholder="e.g. 8"
+                        className="border-gray-200 focus:border-green-400"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -833,12 +1054,18 @@ const AddNewJob = () => {
 
             <FormField
               control={form.control}
-              name="educationQualifications"
+              name="educationRequirements"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-gray-700 font-medium">Education Requirements</FormLabel>
+                  <FormLabel className="text-gray-700 font-medium">
+                    Education Requirements
+                  </FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g. Bachelor's in Computer Science" className="border-gray-200 focus:border-green-400" {...field} />
+                    <Input
+                      placeholder="e.g. Bachelor's in Computer Science"
+                      className="border-gray-200 focus:border-green-400"
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -847,13 +1074,19 @@ const AddNewJob = () => {
 
             {/* Primary Skills */}
             <div>
-              <Label className="text-gray-700 font-medium mb-3 block">Primary Skills</Label>
+              <Label className="text-gray-700 font-medium mb-3 block">
+                Primary Skills
+              </Label>
               <div className="flex flex-wrap gap-2 mb-3">
                 {skills.map((skill, index) => (
-                  <Badge key={index} variant="secondary" className="bg-green-100 text-green-800 border-green-200">
+                  <Badge
+                    key={index}
+                    variant="secondary"
+                    className="bg-green-100 text-green-800 border-green-200"
+                  >
                     {skill}
                     <button
-                      onClick={() => removeSkill(skill, 'primary')}
+                      onClick={() => removeSkill(skill, "primary")}
                       className="ml-2 hover:text-red-600"
                     >
                       <X className="h-3 w-3" />
@@ -867,9 +1100,17 @@ const AddNewJob = () => {
                   onChange={(e) => setNewSkill(e.target.value)}
                   placeholder="Add a skill"
                   className="border-gray-200 focus:border-green-400"
-                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addSkill('primary'))}
+                  onKeyDown={(e) =>
+                    e.key === "Enter" &&
+                    (e.preventDefault(), addSkill("primary"))
+                  }
                 />
-                <Button type="button" onClick={() => addSkill('primary')} variant="outline" size="sm">
+                <Button
+                  type="button"
+                  onClick={() => addSkill("primary")}
+                  variant="outline"
+                  size="sm"
+                >
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
@@ -877,13 +1118,19 @@ const AddNewJob = () => {
 
             {/* Secondary Skills */}
             <div>
-              <Label className="text-gray-700 font-medium mb-3 block">Secondary Skills</Label>
+              <Label className="text-gray-700 font-medium mb-3 block">
+                Secondary Skills
+              </Label>
               <div className="flex flex-wrap gap-2 mb-3">
                 {secondarySkills.map((skill, index) => (
-                  <Badge key={index} variant="secondary" className="bg-blue-100 text-blue-800 border-blue-200">
+                  <Badge
+                    key={index}
+                    variant="secondary"
+                    className="bg-blue-100 text-blue-800 border-blue-200"
+                  >
                     {skill}
                     <button
-                      onClick={() => removeSkill(skill, 'secondary')}
+                      onClick={() => removeSkill(skill, "secondary")}
                       className="ml-2 hover:text-red-600"
                     >
                       <X className="h-3 w-3" />
@@ -897,9 +1144,17 @@ const AddNewJob = () => {
                   onChange={(e) => setNewSecondarySkill(e.target.value)}
                   placeholder="Add a secondary skill"
                   className="border-gray-200 focus:border-green-400"
-                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addSkill('secondary'))}
+                  onKeyDown={(e) =>
+                    e.key === "Enter" &&
+                    (e.preventDefault(), addSkill("secondary"))
+                  }
                 />
-                <Button type="button" onClick={() => addSkill('secondary')} variant="outline" size="sm">
+                <Button
+                  type="button"
+                  onClick={() => addSkill("secondary")}
+                  variant="outline"
+                  size="sm"
+                >
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
@@ -910,9 +1165,15 @@ const AddNewJob = () => {
               name="spokenLanguages"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-gray-700 font-medium">Spoken Languages</FormLabel>
+                  <FormLabel className="text-gray-700 font-medium">
+                    Spoken Languages
+                  </FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g. English, Spanish" className="border-gray-200 focus:border-green-400" {...field} />
+                    <Input
+                      placeholder="e.g. English, Spanish"
+                      className="border-gray-200 focus:border-green-400"
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -924,9 +1185,15 @@ const AddNewJob = () => {
               name="documentsRequired"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-gray-700 font-medium">Required Documents</FormLabel>
+                  <FormLabel className="text-gray-700 font-medium">
+                    Required Documents
+                  </FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g. Resume, Portfolio, References" className="border-gray-200 focus:border-green-400" {...field} />
+                    <Input
+                      placeholder="e.g. Resume, Portfolio, References"
+                      className="border-gray-200 focus:border-green-400"
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -944,9 +1211,16 @@ const AddNewJob = () => {
                 name="numberOfPositions"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-gray-700 font-medium">Number of Positions</FormLabel>
+                    <FormLabel className="text-gray-700 font-medium">
+                      Number of Positions
+                    </FormLabel>
                     <FormControl>
-                      <Input type="number" placeholder="1" className="border-gray-200 focus:border-green-400" {...field} />
+                      <Input
+                        type="number"
+                        placeholder="1"
+                        className="border-gray-200 focus:border-green-400"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -958,9 +1232,16 @@ const AddNewJob = () => {
                 name="maxSubmissionsAllowed"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-gray-700 font-medium">Max Submissions</FormLabel>
+                    <FormLabel className="text-gray-700 font-medium">
+                      Max Submissions
+                    </FormLabel>
                     <FormControl>
-                      <Input type="number" placeholder="10" className="border-gray-200 focus:border-green-400" {...field} />
+                      <Input
+                        type="number"
+                        placeholder="10"
+                        className="border-gray-200 focus:border-green-400"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -974,7 +1255,9 @@ const AddNewJob = () => {
                 name="taxTerms"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-gray-700 font-medium">Tax Terms</FormLabel>
+                    <FormLabel className="text-gray-700 font-medium">
+                      Tax Terms
+                    </FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger className="border-gray-200 focus:border-green-400">
@@ -984,7 +1267,9 @@ const AddNewJob = () => {
                       <SelectContent className="bg-white">
                         <SelectItem value="W2">W2</SelectItem>
                         <SelectItem value="1099">1099</SelectItem>
-                        <SelectItem value="Corp to Corp">Corp to Corp</SelectItem>
+                        <SelectItem value="Corp to Corp">
+                          Corp to Corp
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -997,7 +1282,9 @@ const AddNewJob = () => {
                 name="paymentTerms"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-gray-700 font-medium">Payment Terms</FormLabel>
+                    <FormLabel className="text-gray-700 font-medium">
+                      Payment Terms
+                    </FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger className="border-gray-200 focus:border-green-400">
@@ -1023,7 +1310,9 @@ const AddNewJob = () => {
               render={({ field }) => (
                 <FormItem className="flex flex-row items-center justify-between rounded-lg border border-gray-200 p-4">
                   <div className="space-y-0.5">
-                    <FormLabel className="text-gray-700 font-medium">Expenses Paid</FormLabel>
+                    <FormLabel className="text-gray-700 font-medium">
+                      Expenses Paid
+                    </FormLabel>
                     <div className="text-sm text-gray-600">
                       Will the company cover job-related expenses?
                     </div>
@@ -1037,6 +1326,54 @@ const AddNewJob = () => {
                 </FormItem>
               )}
             />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <FormField
+                control={form.control}
+                name="vendorEligible"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border border-gray-200 p-4">
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-gray-700 font-medium">
+                        Vendor Eligible
+                      </FormLabel>
+                      <div className="text-sm text-gray-600">
+                        Allow vendor partners to submit candidates?
+                      </div>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="remoteWorkAllowed"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border border-gray-200 p-4">
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-gray-700 font-medium">
+                        Remote Work Allowed
+                      </FormLabel>
+                      <div className="text-sm text-gray-600">
+                        Indicate if candidates can work remotely.
+                      </div>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+            </div>
           </div>
         );
 
@@ -1055,14 +1392,18 @@ const AddNewJob = () => {
               <Plus className="w-6 h-6 text-green-600" />
             </div>
             <div>
-              <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 font-roboto-slab">Add New Job</h1>
-              <p className="text-sm lg:text-base text-gray-600 font-roboto-slab">Create a new job posting</p>
+              <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 font-roboto-slab">
+                Add New Job
+              </h1>
+              <p className="text-sm lg:text-base text-gray-600 font-roboto-slab">
+                Create a new job posting
+              </p>
             </div>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             onClick={() => navigate("/dashboard/jobs")}
             className="border-gray-200 hover:bg-gray-50"
           >
@@ -1080,33 +1421,43 @@ const AddNewJob = () => {
               const IconComponent = step.icon;
               const isActive = currentStep === step.id;
               const isCompleted = currentStep > step.id;
-              
+
               return (
                 <div key={step.id} className="flex items-center">
                   <div className="flex flex-col items-center">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
-                      isActive 
-                        ? 'bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg shadow-green-500/30' 
-                        : isCompleted
-                        ? 'bg-green-100 text-green-600 border-2 border-green-200'
-                        : 'bg-gray-100 text-gray-400 border-2 border-gray-200'
-                    }`}>
+                    <div
+                      className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
+                        isActive
+                          ? "bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg shadow-green-500/30"
+                          : isCompleted
+                          ? "bg-green-100 text-green-600 border-2 border-green-200"
+                          : "bg-gray-100 text-gray-400 border-2 border-gray-200"
+                      }`}
+                    >
                       {isCompleted ? (
                         <CheckCircle className="w-5 h-5" />
                       ) : (
                         <IconComponent className="w-5 h-5" />
                       )}
                     </div>
-                    <span className={`text-sm font-medium mt-2 ${
-                      isActive ? 'text-green-600' : isCompleted ? 'text-green-600' : 'text-gray-500'
-                    }`}>
+                    <span
+                      className={`text-sm font-medium mt-2 ${
+                        isActive
+                          ? "text-green-600"
+                          : isCompleted
+                          ? "text-green-600"
+                          : "text-gray-500"
+                      }`}
+                    >
                       {step.title}
                     </span>
                   </div>
                   {index < steps.length - 1 && (
-                    <div className={`w-16 h-0.5 mx-4 transition-all duration-300 ${
-                      currentStep > step.id ? 'bg-green-400' : 'bg-gray-200'
-                    }`} />
+                    <div
+                      className={`w-16 h-0.5 mx-4 transition-all duration-300 ${
+                        currentStep > step.id ? "bg-green-400" : "bg-gray-200"
+                      }`}
+                    />
                   )}
                 </div>
               );
@@ -1117,28 +1468,14 @@ const AddNewJob = () => {
 
       {/* Form Content */}
       <Form {...form}>
-        <form onSubmit={(e) => {
-          e.preventDefault();
-          // Only allow submission on step 4
-          if (currentStep === 4) {
-            form.handleSubmit(handleSubmit)(e);
-          } else {
-            toast({
-              title: "Please Complete All Steps",
-              description: "Please complete all steps before submitting.",
-              variant: "destructive",
-            });
-          }
-        }}>
+        <form onSubmit={(event) => event.preventDefault()}>
           <Card className="backdrop-blur-xl bg-white/30 border border-white/20 shadow-md">
             <CardHeader className="border-b border-white/20 pb-4">
               <CardTitle className="text-lg font-bold font-roboto-slab text-gray-800">
-                {steps.find(s => s.id === currentStep)?.title}
+                {steps.find((s) => s.id === currentStep)?.title}
               </CardTitle>
             </CardHeader>
-            <CardContent className="pt-6">
-              {renderStepContent()}
-            </CardContent>
+            <CardContent className="pt-6">{renderStepContent()}</CardContent>
           </Card>
 
           {/* Navigation Buttons */}
@@ -1152,7 +1489,7 @@ const AddNewJob = () => {
             >
               Previous
             </Button>
-            
+
             <div className="flex gap-2">
               {currentStep < 4 ? (
                 <Button
@@ -1164,8 +1501,9 @@ const AddNewJob = () => {
                 </Button>
               ) : (
                 <Button
-                  type="submit"
+                  type="button"
                   disabled={isSubmitting}
+                  onClick={handleCreateJobClick}
                   className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white shadow-md disabled:opacity-50"
                 >
                   <Save className="w-4 h-4 mr-2" />
