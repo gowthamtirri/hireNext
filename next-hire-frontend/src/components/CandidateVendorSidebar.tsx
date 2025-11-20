@@ -73,45 +73,30 @@ const candidateMenuItems = [
 
 const vendorMenuItems = [
   {
-    title: "Dashboard",
+    title: "Overview",
     url: "/dashboard",
     icon: Home,
+  },
+  {
+    title: "Job Board",
+    url: "/dashboard/vendor/jobs",
+    icon: Briefcase,
+  },
+  {
+    title: "Candidate Pool",
+    url: "/dashboard/vendor/candidates",
+    icon: Users,
+  },
+  {
+    title: "Submissions",
+    url: "/dashboard/vendor/submissions",
+    icon: FileText,
   },
   {
     title: "My Profile",
     url: "/dashboard/profile",
     icon: UserCheck,
   },
-  {
-    title: "Job Marketplace",
-    url: "/dashboard/job-marketplace",
-    icon: MapPin,
-  },
-  {
-    title: "Job Search",
-    url: "/dashboard/job-search",
-    icon: Search,
-  },
-  {
-    title: "My Submissions",
-    url: "/dashboard/my-submissions",
-    icon: FileText,
-  },
-  {
-    title: "My Placements",
-    url: "/dashboard/my-placements",
-    icon: Trophy,
-  },
-  // {
-  //   title: "Time Sheets",
-  //   url: "/dashboard/time-sheets",
-  //   icon: Clock,
-  // },
-  // {
-  //   title: "Tickets",
-  //   url: "/dashboard/tickets",
-  //   icon: Ticket,
-  // },
 ];
 
 const quickLinks = [];

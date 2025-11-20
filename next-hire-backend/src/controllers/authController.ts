@@ -66,6 +66,7 @@ export const signup = asyncHandler(async (req: Request, res: Response) => {
     case "candidate":
       await Candidate.create({
         user_id: user.id,
+        created_by: user.id,
         first_name,
         last_name,
         phone,

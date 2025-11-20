@@ -71,6 +71,8 @@ export interface Job {
   assigned_to?: string;
   created_at: string;
   updated_at: string;
+  total_submissions?: number;
+  vendor_submissions?: number;
 }
 
 // Candidate types
@@ -93,6 +95,11 @@ export interface Candidate {
   created_by: string;
   created_at: string;
   updated_at: string;
+  user?: {
+    id: string;
+    email: string;
+    status?: string;
+  };
 }
 
 export interface CreateCandidateRequest {
@@ -100,6 +107,7 @@ export interface CreateCandidateRequest {
   first_name: string;
   last_name: string;
   phone?: string;
+  location?: string;
   current_salary?: number;
   expected_salary?: number;
   experience_years?: number;
@@ -107,10 +115,11 @@ export interface CreateCandidateRequest {
   linkedin_url?: string;
   portfolio_url?: string;
   skills?: string[];
+  bio?: string;
 }
 
 // Submission types
-export type SubmissionStatus = 
+export type SubmissionStatus =
   | "submitted"
   | "under_review"
   | "shortlisted"
@@ -174,7 +183,9 @@ class VendorService {
    */
   async getProfile(): Promise<VendorProfileResponse> {
     try {
-      const response = await apiClient.get<VendorProfileResponse>("/vendor/profile");
+      const response = await apiClient.get<VendorProfileResponse>(
+        "/vendor/profile"
+      );
       return response.data;
     } catch (error: any) {
       throw this.handleError(error);
@@ -184,9 +195,14 @@ class VendorService {
   /**
    * Update vendor profile
    */
-  async updateProfile(data: UpdateVendorProfileRequest): Promise<ApiResponse<VendorProfile>> {
+  async updateProfile(
+    data: UpdateVendorProfileRequest
+  ): Promise<ApiResponse<VendorProfile>> {
     try {
-      const response = await apiClient.put<ApiResponse<VendorProfile>>("/vendor/profile", data);
+      const response = await apiClient.put<ApiResponse<VendorProfile>>(
+        "/vendor/profile",
+        data
+      );
       return response.data;
     } catch (error: any) {
       throw this.handleError(error);
@@ -196,16 +212,21 @@ class VendorService {
   /**
    * Get vendor-eligible jobs
    */
-  async getJobs(filters: {
-    page?: number;
-    limit?: number;
-    salary_min?: number;
-    salary_max?: number;
-    experience_min?: number;
-    experience_max?: number;
-    location?: string;
-    skills?: string;
-  } = {}): Promise<JobsResponse> {
+  async getJobs(
+    filters: {
+      page?: number;
+      limit?: number;
+      salary_min?: number;
+      salary_max?: number;
+      experience_min?: number;
+      experience_max?: number;
+      location?: string;
+      skills?: string;
+      search?: string;
+      job_type?: JobType;
+      remote_work_allowed?: boolean;
+    } = {}
+  ): Promise<JobsResponse> {
     try {
       const params = new URLSearchParams();
       Object.entries(filters).forEach(([key, value]) => {
@@ -214,7 +235,9 @@ class VendorService {
         }
       });
 
-      const response = await apiClient.get<JobsResponse>(`/vendor/jobs?${params.toString()}`);
+      const response = await apiClient.get<JobsResponse>(
+        `/vendor/jobs?${params.toString()}`
+      );
       return response.data;
     } catch (error: any) {
       throw this.handleError(error);
@@ -226,7 +249,9 @@ class VendorService {
    */
   async getJobDetails(jobId: string): Promise<SingleJobResponse> {
     try {
-      const response = await apiClient.get<SingleJobResponse>(`/vendor/jobs/${jobId}`);
+      const response = await apiClient.get<SingleJobResponse>(
+        `/vendor/jobs/${jobId}`
+      );
       return response.data;
     } catch (error: any) {
       throw this.handleError(error);
@@ -236,9 +261,15 @@ class VendorService {
   /**
    * Submit candidate to job
    */
-  async submitCandidate(jobId: string, data: SubmitCandidateRequest): Promise<SingleSubmissionResponse> {
+  async submitCandidate(
+    jobId: string,
+    data: SubmitCandidateRequest
+  ): Promise<SingleSubmissionResponse> {
     try {
-      const response = await apiClient.post<SingleSubmissionResponse>(`/vendor/jobs/${jobId}/submit`, data);
+      const response = await apiClient.post<SingleSubmissionResponse>(
+        `/vendor/jobs/${jobId}/submit`,
+        data
+      );
       return response.data;
     } catch (error: any) {
       throw this.handleError(error);
@@ -248,12 +279,14 @@ class VendorService {
   /**
    * Get vendor's submissions
    */
-  async getSubmissions(filters: {
-    page?: number;
-    limit?: number;
-    status?: SubmissionStatus;
-    job_id?: string;
-  } = {}): Promise<SubmissionsResponse> {
+  async getSubmissions(
+    filters: {
+      page?: number;
+      limit?: number;
+      status?: SubmissionStatus;
+      job_id?: string;
+    } = {}
+  ): Promise<SubmissionsResponse> {
     try {
       const params = new URLSearchParams();
       Object.entries(filters).forEach(([key, value]) => {
@@ -262,7 +295,9 @@ class VendorService {
         }
       });
 
-      const response = await apiClient.get<SubmissionsResponse>(`/vendor/submissions?${params.toString()}`);
+      const response = await apiClient.get<SubmissionsResponse>(
+        `/vendor/submissions?${params.toString()}`
+      );
       return response.data;
     } catch (error: any) {
       throw this.handleError(error);
@@ -272,9 +307,13 @@ class VendorService {
   /**
    * Get submission status
    */
-  async getSubmissionStatus(submissionId: string): Promise<SingleSubmissionResponse> {
+  async getSubmissionStatus(
+    submissionId: string
+  ): Promise<SingleSubmissionResponse> {
     try {
-      const response = await apiClient.get<SingleSubmissionResponse>(`/vendor/submissions/${submissionId}`);
+      const response = await apiClient.get<SingleSubmissionResponse>(
+        `/vendor/submissions/${submissionId}`
+      );
       return response.data;
     } catch (error: any) {
       throw this.handleError(error);
@@ -284,9 +323,14 @@ class VendorService {
   /**
    * Create candidate
    */
-  async createCandidate(data: CreateCandidateRequest): Promise<SingleCandidateResponse> {
+  async createCandidate(
+    data: CreateCandidateRequest
+  ): Promise<SingleCandidateResponse> {
     try {
-      const response = await apiClient.post<SingleCandidateResponse>("/vendor/candidates", data);
+      const response = await apiClient.post<SingleCandidateResponse>(
+        "/vendor/candidates",
+        data
+      );
       return response.data;
     } catch (error: any) {
       throw this.handleError(error);
@@ -296,14 +340,17 @@ class VendorService {
   /**
    * Get vendor's candidates
    */
-  async getCandidates(filters: {
-    page?: number;
-    limit?: number;
-    experience_min?: number;
-    experience_max?: number;
-    availability_status?: "available" | "not_available" | "interviewing";
-    skills?: string;
-  } = {}): Promise<CandidatesResponse> {
+  async getCandidates(
+    filters: {
+      page?: number;
+      limit?: number;
+      experience_min?: number;
+      experience_max?: number;
+      availability_status?: "available" | "not_available" | "interviewing";
+      skills?: string;
+      search?: string;
+    } = {}
+  ): Promise<CandidatesResponse> {
     try {
       const params = new URLSearchParams();
       Object.entries(filters).forEach(([key, value]) => {
@@ -312,7 +359,9 @@ class VendorService {
         }
       });
 
-      const response = await apiClient.get<CandidatesResponse>(`/vendor/candidates?${params.toString()}`);
+      const response = await apiClient.get<CandidatesResponse>(
+        `/vendor/candidates?${params.toString()}`
+      );
       return response.data;
     } catch (error: any) {
       throw this.handleError(error);
@@ -376,7 +425,7 @@ class VendorService {
 
   formatSalaryRange(job: Job): string {
     if (!job.salary_min && !job.salary_max) return "Salary not specified";
-    
+
     const currency = job.salary_currency || "USD";
     const formatAmount = (amount: number) => {
       return new Intl.NumberFormat("en-US", {
@@ -388,7 +437,9 @@ class VendorService {
     };
 
     if (job.salary_min && job.salary_max) {
-      return `${formatAmount(job.salary_min)} - ${formatAmount(job.salary_max)}`;
+      return `${formatAmount(job.salary_min)} - ${formatAmount(
+        job.salary_max
+      )}`;
     } else if (job.salary_min) {
       return `From ${formatAmount(job.salary_min)}`;
     } else {

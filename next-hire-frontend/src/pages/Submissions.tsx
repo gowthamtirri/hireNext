@@ -463,9 +463,11 @@ const Submissions = () => {
               <FileText className="h-8 w-8 text-gray-400 mx-auto mb-2" />
               <p className="text-gray-600">No submissions found</p>
               <p className="text-sm text-gray-500 mt-1">
-                {user.role === "candidate" ? "Start applying to jobs to see your applications here" : 
-                 user.role === "recruiter" ? "View submissions by going to Jobs → [Select Job] → View Submissions" :
-                 "Applications will appear here once candidates apply to your jobs"}
+                {user.role === "candidate"
+                  ? "Start applying to jobs to see your applications here"
+                  : user.role === "recruiter"
+                  ? "View submissions by going to Jobs → [Select Job] → View Submissions"
+                  : "Submissions will appear here after you submit candidates to client jobs"}
               </p>
               {user.role === "recruiter" && (
                 <Button 

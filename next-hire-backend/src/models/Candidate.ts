@@ -5,6 +5,7 @@ import { User } from "./User";
 export interface CandidateAttributes {
   id: string;
   user_id: string;
+  created_by?: string | null;
   first_name?: string;
   last_name?: string;
   phone?: string;
@@ -27,7 +28,7 @@ export interface CandidateAttributes {
 export interface CandidateCreationAttributes
   extends Optional<
     CandidateAttributes,
-    "id" | "availability_status" | "created_at" | "updated_at"
+    "id" | "availability_status" | "created_at" | "updated_at" | "created_by"
   > {}
 
 export class Candidate
@@ -36,6 +37,7 @@ export class Candidate
 {
   public id!: string;
   public user_id!: string;
+  public created_by?: string | null;
   public first_name?: string;
   public last_name?: string;
   public phone?: string;
@@ -75,6 +77,15 @@ Candidate.init(
         key: "id",
       },
       onDelete: "CASCADE",
+    },
+    created_by: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      references: {
+        model: User,
+        key: "id",
+      },
+      onDelete: "SET NULL",
     },
     first_name: {
       type: DataTypes.STRING,
@@ -199,6 +210,9 @@ Candidate.init(
       },
       {
         fields: ["experience_years"],
+      },
+      {
+        fields: ["created_by"],
       },
     ],
   }

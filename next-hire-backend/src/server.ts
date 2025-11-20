@@ -11,6 +11,7 @@ import { sequelize, applyAssociations } from "./models";
 import { logger } from "./utils/logger";
 import { errorHandler } from "./middleware/errorHandler";
 import { notFoundHandler } from "./middleware/notFoundHandler";
+import { ensureCandidateCreatedByColumn } from "./utils/schemaPatcher";
 
 // Routes
 import authRoutes from "./routes/auth";
@@ -101,6 +102,7 @@ app.use(errorHandler);
 // Database connection and server start
 const startServer = async () => {
   try {
+    await ensureCandidateCreatedByColumn();
     applyAssociations();
     // Test database connection
     await sequelize.authenticate();

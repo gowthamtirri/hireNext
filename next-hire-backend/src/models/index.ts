@@ -27,6 +27,11 @@ export function applyAssociations() {
   User.hasOne(Vendor, { foreignKey: "user_id", as: "vendorProfile" });
 
   Candidate.belongsTo(User, { foreignKey: "user_id", as: "user" });
+  Candidate.belongsTo(User, { foreignKey: "created_by", as: "creator" });
+  User.hasMany(Candidate, {
+    foreignKey: "created_by",
+    as: "createdCandidates",
+  });
   Recruiter.belongsTo(User, { foreignKey: "user_id", as: "user" });
   Vendor.belongsTo(User, { foreignKey: "user_id", as: "user" });
 
@@ -56,8 +61,14 @@ export function applyAssociations() {
 
   // Placements
   Placement.belongsTo(Job, { foreignKey: "job_id", as: "job" });
-  Placement.belongsTo(Candidate, { foreignKey: "candidate_id", as: "candidate" });
-  Placement.belongsTo(Submission, { foreignKey: "submission_id", as: "submission" });
+  Placement.belongsTo(Candidate, {
+    foreignKey: "candidate_id",
+    as: "candidate",
+  });
+  Placement.belongsTo(Submission, {
+    foreignKey: "submission_id",
+    as: "submission",
+  });
   Placement.belongsTo(User, { foreignKey: "recruiter_id", as: "recruiter" });
   Placement.belongsTo(User, { foreignKey: "vendor_id", as: "vendor" });
   Placement.belongsTo(User, { foreignKey: "created_by", as: "creator" });
@@ -69,19 +80,37 @@ export function applyAssociations() {
   Task.belongsTo(Submission, { foreignKey: "submission_id", as: "submission" });
 
   // Candidate Experience & Education
-  Candidate.hasMany(Experience, { foreignKey: "candidate_id", as: "experiences" });
-  Experience.belongsTo(Candidate, { foreignKey: "candidate_id", as: "candidate" });
+  Candidate.hasMany(Experience, {
+    foreignKey: "candidate_id",
+    as: "experiences",
+  });
+  Experience.belongsTo(Candidate, {
+    foreignKey: "candidate_id",
+    as: "candidate",
+  });
 
   Candidate.hasMany(Education, { foreignKey: "candidate_id", as: "education" });
-  Education.belongsTo(Candidate, { foreignKey: "candidate_id", as: "candidate" });
+  Education.belongsTo(Candidate, {
+    foreignKey: "candidate_id",
+    as: "candidate",
+  });
 
   // Candidate Skills
-  Candidate.hasMany(CandidateSkill, { foreignKey: "candidate_id", as: "candidateSkills" });
-  CandidateSkill.belongsTo(Candidate, { foreignKey: "candidate_id", as: "candidate" });
+  Candidate.hasMany(CandidateSkill, {
+    foreignKey: "candidate_id",
+    as: "candidateSkills",
+  });
+  CandidateSkill.belongsTo(Candidate, {
+    foreignKey: "candidate_id",
+    as: "candidate",
+  });
 
   // Business Partners
   BusinessPartner.belongsTo(User, { foreignKey: "created_by", as: "creator" });
-  BusinessPartner.belongsTo(User, { foreignKey: "assigned_to", as: "assignee" });
+  BusinessPartner.belongsTo(User, {
+    foreignKey: "assigned_to",
+    as: "assignee",
+  });
 }
 
 // Export models & sequelize

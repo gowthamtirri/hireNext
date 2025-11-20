@@ -53,6 +53,8 @@ import SignupCandidate from "./pages/SignupCandidate";
 import SignupVendor from "./pages/SignupVendor";
 import JobDetailNew from "./pages/JobDetailNew";
 import JobApplication from "./pages/JobApplication";
+import VendorJobs from "./pages/VendorJobs";
+import VendorCandidates from "./pages/VendorCandidates";
 
 const queryClient = new QueryClient();
 
@@ -147,6 +149,30 @@ const App = () => (
               <Route path="my-submissions" element={<Submissions />} />
               <Route path="my-placements" element={<Placements />} />
               <Route path="my-relationships" element={<MyRelationships />} />
+              <Route
+                path="vendor/jobs"
+                element={
+                  <ProtectedRoute allowedRoles={["vendor"]}>
+                    <VendorJobs />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="vendor/candidates"
+                element={
+                  <ProtectedRoute allowedRoles={["vendor"]}>
+                    <VendorCandidates />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="vendor/submissions"
+                element={
+                  <ProtectedRoute allowedRoles={["vendor"]}>
+                    <Submissions />
+                  </ProtectedRoute>
+                }
+              />
             </Route>
 
             <Route path="*" element={<NotFound />} />

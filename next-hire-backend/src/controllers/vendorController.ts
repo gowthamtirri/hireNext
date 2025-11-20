@@ -508,6 +508,11 @@ export const getSubmissionStatus = asyncHandler(
 // Create a candidate profile (for vendors to add candidates to their pool)
 export const createCandidate = asyncHandler(
   async (req: AuthenticatedRequest, res: Response) => {
+    const vendorUserId = req.user?.userId;
+    if (!vendorUserId) {
+      throw createError("Unable to identify vendor user", 401);
+    }
+
     const {
       email,
       first_name,
@@ -544,6 +549,7 @@ export const createCandidate = asyncHandler(
     // Create candidate profile
     const candidate = await Candidate.create({
       user_id: user.id,
+      created_by: vendorUserId,
       first_name,
       last_name,
       phone,
@@ -579,6 +585,11 @@ export const createCandidate = asyncHandler(
 // List vendor's candidate pool
 export const getMyCandidates = asyncHandler(
   async (req: AuthenticatedRequest, res: Response) => {
+    const vendorUserId = req.user?.userId;
+    if (!vendorUserId) {
+      throw createError("Unable to identify vendor user", 401);
+    }
+
     const {
       page = 1,
       limit = 20,
@@ -594,7 +605,9 @@ export const getMyCandidates = asyncHandler(
     // Build where conditions for candidates created by this vendor
     // Note: In a real system, you'd need to track which vendor created which candidate
     // For now, we'll show all candidates (this would need to be refined)
-    const whereConditions: any = {};
+    const whereConditions: any = {
+      created_by: vendorUserId,
+    };
 
     if (search) {
       whereConditions[Op.or] = [

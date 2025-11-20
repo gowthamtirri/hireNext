@@ -21,6 +21,9 @@ export const useVendorJobs = (initialFilters: {
   experience_max?: number;
   location?: string;
   skills?: string;
+  search?: string;
+  job_type?: string;
+  remote_work_allowed?: boolean;
 } = {}) => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(false);
@@ -101,6 +104,7 @@ export const useVendorCandidates = (initialFilters: {
   experience_max?: number;
   availability_status?: "available" | "not_available" | "interviewing";
   skills?: string;
+  search?: string;
 } = {}) => {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [loading, setLoading] = useState(false);
